@@ -8,12 +8,20 @@ from app.models.base import TimestampMixin
 
 class UserRole(str, enum.Enum):
     ADMIN = "ADMIN"
+    OWNER = "OWNER"
     SALESMAN = "SALESMAN"
-    PRODUCTION_SUPERVISOR = "PRODUCTION_SUPERVISOR"
+    PRODUCTION = "PRODUCTION"
     ACCOUNTANT = "ACCOUNTANT"
+
+    # Compatibility alias
+    PRODUCTION_SUPERVISOR = "PRODUCTION"
 
 
 class User(Base, TimestampMixin):
+    """
+    User entity with role-based access for salesman, production,
+    accountant, administrator, and business owner.
+    """
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
