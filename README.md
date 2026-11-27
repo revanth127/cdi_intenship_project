@@ -93,7 +93,7 @@ These are demo-only credentials created by the seed. The seed contains six accou
 | Owner | `owner@foodmfr.local` | `OwnerPass123!` | Executive overview, costing, variance alerts, receivables, and telemetry |
 | Admin | `admin@foodmfr.local` | `AdminPass123!` | System configuration, users, master data, and order approval |
 | Production | `production@foodmfr.local` | `ProdPass123!` | BOMs, production runs, consumption, and variance alerts |
-| Accountant | `accountant@foodmfr.local` | `AcctPass123!` | GST invoices, receivables, payment allocation, and audit reports |
+| Accountant | `accountant@foodmfr.local` | `AcctPass123!` | Read-only GST invoices, receivables, stock, orders; reports & exports (CSV/XLSX/PDF); audit history |
 | Salesman A | `salesman.a@foodmfr.local` | `SalesPass123!` | Mobile order booking and pricing catalog for Retailer A |
 | Salesman B | `salesman.b@foodmfr.local` | `SalesPass123!` | Mobile order booking and pricing catalog for Distributor B |
 
@@ -125,13 +125,17 @@ The repository does not include the Section 6 rubric text, so the following is a
 - **Done** — Salesman order entry and customer assignment for the two seeded salesmen.
 - **Done** — Inventory ledger, production runs, weighted-average costing, and variance calculations in the backend.
 - **Done** — Invoice, payment, and receivables backend workflows.
-- **Partial** — Overview dashboard uses API-backed inventory, sales, orders, variance, costing, and receivables data; some non-dashboard modules are placeholders.
+- **Done** — Purchases (goods receipts), perpetual stock ledger with source-document links, production runs with variance chips, and batch costing.
+- **Done** — Admin orders inbox (approve/reject/edit/raise invoice, shortage override), GST invoices (PDF, dispatch, credit notes), and receivables (outstanding, ageing, record payment).
+- **Done** — Role landing pages, per-role sidebar, and accountant read-only mode (mutations hidden in UI and rejected with 403).
+- **Done** — Overview dashboard uses API-backed inventory, sales, orders, variance, costing, and receivables data.
 
 ### Should-have
 
-- **Partial** — HTTP-based Section 5 benchmark workflow is implemented; its clean-database end-to-end output is pending verification.
+- **Done** — HTTP-based Section 5 benchmark workflow verified on a clean database (`make benchmark`, 31/31 checks passed).
 - **Done** — Audit-oriented stock movements, order history, and invoice/credit-note domain workflows.
-- **Partial** — Role-restricted Production, Stock, Receivables, and Reports pages exist in the frontend shell but currently display placeholder content.
+- **Done** — Role-restricted Production, Stock, Receivables, and Reports pages are live API-backed screens.
+- **Done** — Reports & exports: report registry with shared JSON/CSV/XLSX/PDF exporters; `GET /reports/{name}?from=&to=&as_of=&format=`; period-selectable Reports page with on-screen preview.
 - **Partial** — Salesman order flow supports offline-oriented client behavior; full offline synchronization coverage is not established by the repository's tests.
 
 ### Stretch
@@ -140,6 +144,52 @@ The repository does not include the Section 6 rubric text, so the following is a
 - **Done** — Optional demo-volume seed script, separate from the default benchmark seed.
 - **Not done** — Hosted deployment URL and live-service verification.
 - **Not done** — A Section 6-specific completion assessment; its rubric is not present in the repository.
+
+## Endpoint list per screen
+
+All API routes are mounted under `/api/v1` (and re-exported at root). Writes require the roles shown; accountant is read-only.
+
+### Owner Overview (`/`, OWNER)
+- `GET /dashboard/summary?range=today|7d|30d`
+- `GET /orders?status=SUBMITTED`
+
+### Admin Orders (`/orders`, ADMIN; read-only for ACCOUNTANT)
+- `GET /orders`, `GET /orders/{id}`
+- `PATCH /orders/{id}` (edit lines, admin)
+- `POST /orders/{id}/approve`, `POST /orders/{id}/reject`, `POST /orders/{id}/invoice` (admin)
+
+### Salesman New Order (`/orders/new`, SALESMAN + owner/admin)
+- `GET /customers`, `GET /products`, `POST /orders`, `GET /orders` (salesman-scoped); offline IndexedDB outbox synced via `POST /orders`
+
+### Salesman My Orders (`/orders/my`, `/orders`, SALESMAN)
+- Local IndexedDB outbox; `POST /orders`, `GET /orders` (salesman-scoped); offline sync engine
+
+### Invoices (`/invoices`, ADMIN + ACCOUNTANT; read-only for ACCOUNTANT)
+- `GET /invoices`, `GET /invoices/{id}`, `GET /invoices/{id}/pdf`, `GET /invoices/{id}/share-link`, `GET /invoices/{id}/history`
+- `POST /orders/{id}/invoice`, `POST /invoices/{id}/dispatch`, `POST /invoices/{id}/credit-note`, `GET /invoices/credit-notes/{id}/pdf` (dispatch/credit admin); `GET /invoices/{id}/share-link`
+- invoice is created from an approved order; grand total for Retailer A benchmark = Rs 7,500 + Rs 187.50 CGST + Rs 187.50 SGST = **Rs 7,875.00**
+
+### Receivables (`/receivables`, ADMIN + ACCOUNTANT; read-only for ACCOUNTANT)
+- `GET /receivables/outstanding`, `GET /receivables/ageing`, `GET /receivables/collections`, `GET /customers/{id}/statement`
+- `POST /payments` (record payment, FIFO or explicit allocation; admin), `GET /payments`, `POST /payments/{id}/reverse`, `POST /customers/{id}/allocate-advance`
+- benchmark: Rs 7,875 invoice − Rs 4,000 payment → outstanding **Rs 3,875.00**
+
+### Purchases (`/purchases`, OWNER/ADMIN/PRODUCTION)
+- `GET /suppliers`, `GET /items`, `GET /purchases`, `GET /purchases/{id}`, `POST /purchases`, `POST /purchases/{id}/cancel` (cancel admin)
+
+### Stock (`/stock`, OWNER/ADMIN/PRODUCTION/ACCOUNTANT read-only for accountant)
+- `GET /stock/summary`, `GET /stock/ledger?item_id=`, `GET /stock/reconcile`, `POST /stock/adjustments` (admin)
+
+### Production (`/production`, OWNER/ADMIN/PRODUCTION; backend read ADMIN/OWNER/ACCOUNTANT/PRODUCTION, write ADMIN/PRODUCTION)
+- `GET /production`, `GET /production/{id}`, `GET /products`, `GET /boms`
+- `POST /production`, `PATCH /production/{id}`, `POST /production/{id}/post`, `POST /production/{id}/cancel`
+- `GET /costing/runs/{id}`, `GET /costing/products`, `POST /overheads`
+- variance chips: oil +5.0%, yield −6.0%, cartons −10.0% flagged; pouches −3.0% not flagged (strict >3%); flour 120 kg after purchase+production
+
+### Reports (`/reports`, OWNER/ADMIN/ACCOUNTANT; PRODUCTION stock+production only; SALESMAN none)
+- `GET /reports` (list for role), `GET /reports/{name}?from=&to=&as_of=&format=json|csv|xlsx|pdf`
+- business dates are plain IST dates; money paise internally; CSV plain decimals; XLSX numeric + header + freeze + autofilter + totals; every export logs `REPORT_EXPORTED` in `audit_log`
+- reports: `sales_register`, `stock_summary`, `stock_ledger`, `gst_outward`, `purchase_register`, `production_report`, `collections_outstanding`, `sales_by_customer_product`
 
 ## Business assumptions
 
@@ -162,20 +212,20 @@ make benchmark
 API_BASE_URL=http://localhost:8000/api/v1 make benchmark
 ```
 
-`make demo-state` executes those same transactions through the API without the benchmark result table, for screenshots. It also requires a clean database. The values below are the expected checks; the fresh HTTP execution table will be recorded after a clean database run.
+`make demo-state` executes those same transactions through the API without the benchmark result table, for screenshots. It also requires a clean database. Fresh HTTP execution on a clean seeded database: **`make benchmark`, 31/31 checks passed**.
 
 | Check | Expected | Actual | Result |
 |---|---:|---:|---|
-| Owner, Admin, Production, Accountant, and both Salesmen log in | Six role-correct sessions | Pending clean HTTP run | Pending |
-| Flour after purchase, then production | 160 kg, then 120 kg | Pending clean HTTP run | Pending |
-| Finished goods after production, then dispatch | 238 packets, then 88 packets | Pending clean HTTP run | Pending |
-| Oil, spice, pouches, cartons after production | 19.5 L, 3.8 kg, 306, 21 | Pending clean HTTP run | Pending |
-| Yield, oil, carton, pouch variance | -6.00% flagged; +5.00% flagged; -10.00% flagged; -3.00% not flagged | Pending clean HTTP run | Pending |
-| Material cost and overheads | Rs 4,055.00 and Rs 1,800.00 | Pending clean HTTP run | Pending |
-| Total production cost, cost per packet, selling price, margin | Rs 5,855.00; Rs 31.14; Rs 50.00; 37.7% | Pending clean HTTP run | Pending |
-| Retailer A invoice | Rs 7,500.00 + Rs 187.50 CGST + Rs 187.50 SGST = Rs 7,875.00 | Pending clean HTTP run | Pending |
-| Retailer A outstanding after Rs 4,000 payment | Rs 3,875.00 | Pending clean HTTP run | Pending |
-| Distributor B order and IGST estimate | Short by 32 packets; Rs 300.00 IGST | Pending clean HTTP run | Pending |
+| Owner, Admin, Production, Accountant, and both Salesmen log in | Six role-correct sessions | Six role-correct sessions | Pass |
+| Flour after purchase, then production | 160 kg, then 120 kg | 160 kg, then 120 kg | Pass |
+| Finished goods after production, then dispatch | 238 packets, then 88 packets | 238 packets, then 88 packets | Pass |
+| Oil, spice, pouches, cartons after production | 19.5 L, 3.8 kg, 306, 21 | 19.5 L, 3.8 kg, 306, 21 | Pass |
+| Yield, oil, carton, pouch variance | -6.00% flagged; +5.00% flagged; -10.00% flagged; -3.00% not flagged | -6.00% flagged; +5.00% flagged; -10.00% flagged; -3.00% not flagged | Pass |
+| Material cost and overheads | Rs 4,055.00 and Rs 1,800.00 | Rs 4,055.00 and Rs 1,800.00 | Pass |
+| Total production cost, cost per packet, selling price, margin | Rs 5,855.00; Rs 31.14; Rs 50.00; 37.7% | Rs 5,855.00; Rs 31.14; Rs 50.00; 37.7% | Pass |
+| Retailer A invoice | Rs 7,500.00 + Rs 187.50 CGST + Rs 187.50 SGST = Rs 7,875.00 | Rs 7,500.00 + Rs 187.50 CGST + Rs 187.50 SGST = Rs 7,875.00 | Pass |
+| Retailer A outstanding after Rs 4,000 payment | Rs 3,875.00 | Rs 3,875.00 | Pass |
+| Distributor B order and IGST estimate | Short by 32 packets; Rs 300.00 IGST | Short by 32 packets; Rs 300.00 IGST | Pass |
 
 The valuation method is moving weighted average: material issues are valued at the moving weighted-average cost. All shift overheads (Labour Rs 1,200 and Gas Rs 600) are divided over the **188 good packets**; damaged or scrap packets do not absorb inventory value. The expected weighted-average result is **Rs 31.14 per packet**. Under the FIFO alternative, using the earlier Rs 42/kg flour lot, the comparison is **Rs 30.90 per packet**.
 
@@ -195,7 +245,7 @@ Posted invoices are immutable. Changes made to an order before invoicing are rec
 
 ## Known gaps
 
-- The frontend's Production, Stock, Receivables, and Reports routes currently show placeholder pages; backend workflows exist for related operations.
+- The `/reports` Reports page covers operational reports; GSTR-1/3B output is exposed as `gst_outward` JSON/CSV/XLSX/PDF, not a filed return.
 - The Section 6 rubric is not included in this repository, so its requested tier-by-tier rubric compliance cannot be independently verified here.
 - No hosted URL is configured yet.
 - Demo accounts and their passwords are intended only for local evaluation.
