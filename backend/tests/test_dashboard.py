@@ -140,6 +140,22 @@ class TestDashboard(unittest.TestCase):
         self.db.close()
         app.dependency_overrides.clear()
 
+    def test_dashboard_summary_handles_clean_master_data(self):
+        response = self.client.get(
+            "/dashboard/summary?range=today",
+            headers={"Authorization": f"Bearer {self.owner_token}"},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.text)
+        data = response.json()
+        self.assertEqual(data["today"]["orders_received_count"], 0)
+        self.assertEqual(data["today"]["invoices_raised_count"], 0)
+        self.assertEqual(data["stock"]["finished_goods"][0]["on_hand_packets"], 50)
+        self.assertEqual(data["variance_alerts"], [])
+        self.assertEqual(data["receivables"]["total_outstanding_paise"], 0)
+        self.assertEqual(data["costing"][0]["cost_per_packet"], "0.00")
+        self.assertTrue(all(day["taxable_sales_paise"] == 0 for day in data["sales_trend"]))
+
     def test_dashboard_summary_with_section_5_data(self):
         """
         Executes section 5 lifecycle:

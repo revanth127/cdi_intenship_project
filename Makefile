@@ -6,7 +6,7 @@ else
   PYTEST = pytest
 endif
 
-.PHONY: help benchmark test test-backend test-frontend up dev down reset
+.PHONY: help benchmark demo-state test test-backend test-frontend up dev down reset
 
 help:
 	@echo "Available commands:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make dev            Start services in development mode with reload and volume mount"
 	@echo "  make down           Stop Docker Compose services"
 	@echo "  make reset          Tear down services and delete database volume"
+	@echo "  make demo-state     Apply Section 5 transactions to the clean seed"
 	@echo "  make benchmark      Run Section 5 benchmark validation suite"
 	@echo "  make test           Run all backend and frontend tests"
 	@echo "  make test-backend   Run pytest test suite"
@@ -21,6 +22,9 @@ help:
 
 benchmark:
 	DATABASE_URL=$${DATABASE_URL:-postgresql+psycopg2://postgres:postgres@localhost:5434/order_to_audit} $(PYTHON) scripts/run_benchmark.py
+
+demo-state:
+	DATABASE_URL=$${DATABASE_URL:-postgresql+psycopg2://postgres:postgres@localhost:5434/order_to_audit} $(PYTHON) scripts/apply_benchmark_state.py
 
 test: test-backend test-frontend
 

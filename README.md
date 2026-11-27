@@ -6,11 +6,12 @@ Order-to-Audit is a business application for a food manufacturer to track orders
 
 - `backend/app/` — FastAPI application, API routers, database models, schemas, and business services.
 - `backend/alembic/` — database schema migrations.
-- `backend/scripts/seed.py` — idempotent benchmark and demo-account seed.
+- `backend/scripts/seed.py` — idempotent master-data, opening-stock, and demo-account seed.
 - `backend/tests/` — backend API, business-rule, and seed tests.
 - `frontend/src/app/` — routing and application shell.
 - `frontend/src/features/` — authentication, owner dashboard, and salesman order screens.
 - `frontend/src/lib/` — shared API and frontend utilities.
+- `scripts/apply_benchmark_state.py` — applies Section 5 transactions to the clean seed.
 - `scripts/run_benchmark.py` — Section 5 benchmark checks.
 - `scripts/seed_demo_volume.py` — optional extra demo data; not run by the default startup.
 - `docker-compose.yml` — default database, migration/seed, backend, and frontend services.
@@ -25,7 +26,7 @@ Requirements: Docker Engine with the Compose plugin.
 docker compose up --build
 ```
 
-The backend waits for PostgreSQL, runs `alembic upgrade head`, runs the idempotent seed, then starts Uvicorn. The default Compose file does not mount backend source or enable reload.
+The backend waits for PostgreSQL, runs `alembic upgrade head`, loads idempotent master data and opening stock, then starts Uvicorn. It does not create purchases, production runs, orders, invoices, or payments by default. The default Compose file does not mount backend source or enable reload.
 
 - Frontend: http://localhost:3000
 - API docs: http://localhost:8000/docs
@@ -38,6 +39,14 @@ To stop services and remove the seeded database volume:
 ```sh
 docker compose down -v
 ```
+
+The default database is intentionally clean for evaluators. To add the Section 5 transactions for screenshots, run this after Compose is up:
+
+```sh
+make demo-state
+```
+
+`make demo-state` is separate from startup; to return to a clean database, reset with `docker compose down -v` and start Compose again.
 
 To use the development override (backend reload and source mount):
 
@@ -143,13 +152,13 @@ The repository does not include the Section 6 rubric text, so the following is a
 
 ## Section 5 benchmark
 
-With backend dependencies installed and the Compose database running, run the real database checks:
+With the clean database running, the benchmark creates the Section 5 transactions and checks their actual results. Run it once per reset:
 
 ```sh
 make benchmark
 ```
 
-The following values are from the repository's `scripts/run_benchmark.py` output against the seeded database:
+The following values are expected from `scripts/run_benchmark.py` after it applies the Section 5 steps:
 
 | Check | Expected | Actual | Result |
 |---|---:|---:|---|

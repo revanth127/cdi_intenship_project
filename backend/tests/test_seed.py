@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal
 import os
 import sys
@@ -17,13 +16,14 @@ from app.models.customer import Customer, CustomerType
 from app.models.item import Item, ItemType
 from app.models.pricing import PriceList, PriceListItem
 from app.models.product import Product
-from app.models.invoice import Invoice
+from app.models.costing import OverheadEntry
+from app.models.invoice import Dispatch, Invoice
 from app.models.order import Order
+from app.models.payment import Payment
 from app.models.production import ProductionRun
+from app.models.purchase import Purchase
+from app.models.stock import MovementType, StockMovement
 from app.models.user import User, UserRole
-from app.services.dashboard import get_dashboard_summary
-from app.services.orders import attach_order_details
-from app.services.receivables import invoice_outstanding
 from scripts.seed import run_seed
 
 
@@ -183,33 +183,20 @@ class TestSeedScript(unittest.TestCase):
         self.assertEqual(len(self.db.scalars(select(Customer)).all()), 2)
         self.assertEqual(len(self.db.scalars(select(CompanySettings)).all()), 1)
 
-    def test_seed_creates_benchmark_state_idempotently(self):
+    def test_seed_creates_only_master_data_and_opening_stock(self):
         run_seed(self.db)
         run_seed(self.db)
 
-        run = self.db.scalar(select(ProductionRun))
-        invoice = self.db.scalar(select(Invoice))
-        retailer_order = self.db.scalar(
-            select(Order).where(Order.client_uuid == "benchmark-retailer-a-invoice")
-        )
-        distributor_order = self.db.scalar(
-            select(Order).where(Order.client_uuid == "benchmark-distributor-b-order")
-        )
-        self.assertIsNotNone(run)
-        self.assertIsNotNone(invoice)
-        self.assertEqual(run.actual_good_packets, 188)
-        self.assertEqual(invoice.grand_total_paise, 787500)
-        self.assertEqual(invoice_outstanding(self.db, invoice), 387500)
-        self.assertEqual(retailer_order.order_no, f"ORD-{datetime.now().year}-0001")
-        self.assertEqual(distributor_order.order_no, f"ORD-{datetime.now().year}-0002")
-
-        summary = get_dashboard_summary(self.db, use_cache=False)
-        self.assertEqual(summary.stock.finished_goods[0].on_hand_packets, 88)
-        self.assertEqual(summary.receivables.total_outstanding_paise, 387500)
-        self.assertEqual(len(summary.variance_alerts), 3)
-        self.assertEqual(summary.costing[0].cost_per_packet, Decimal("31.14"))
-        order_with_availability = attach_order_details(self.db, distributor_order)
-        self.assertEqual(order_with_availability.stock_availability[0].shortage, 32)
+        self.assertEqual(len(self.db.scalars(select(StockMovement).where(
+            StockMovement.movement_type == MovementType.OPENING,
+        )).all()), 6)
+        self.assertEqual(len(self.db.scalars(select(Purchase)).all()), 0)
+        self.assertEqual(len(self.db.scalars(select(ProductionRun)).all()), 0)
+        self.assertEqual(len(self.db.scalars(select(OverheadEntry)).all()), 0)
+        self.assertEqual(len(self.db.scalars(select(Order)).all()), 0)
+        self.assertEqual(len(self.db.scalars(select(Invoice)).all()), 0)
+        self.assertEqual(len(self.db.scalars(select(Dispatch)).all()), 0)
+        self.assertEqual(len(self.db.scalars(select(Payment)).all()), 0)
 
 
 if __name__ == "__main__":

@@ -699,7 +699,7 @@ def seed_opening_stock_movements(db: Session, items: dict[str, Item], admin_user
 
 
 def run_seed(db: Session | None = None) -> None:
-    """Entrypoint function to run complete seed process idempotently."""
+    """Seed master data and opening stock without creating business transactions."""
     close_db = False
     if db is None:
         db = SessionLocal()
@@ -713,11 +713,10 @@ def run_seed(db: Session | None = None) -> None:
         family = seed_product_family(db)
         product = seed_product_and_pricing(db, family, items)
         seed_bom(db, family, product, items)
-        customers = seed_customers(db, users)
-        supplier = seed_supplier(db)
+        seed_customers(db, users)
+        seed_supplier(db)
         seed_opening_stock_movements(db, items, users["admin@foodmfr.local"])
         db.commit()
-        seed_benchmark_transactions(db, users, items, product, customers, supplier)
         logger.info("Master data seeding completed successfully!")
         print_credentials_table()
     except Exception as exc:
