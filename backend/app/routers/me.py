@@ -19,7 +19,7 @@ from app.services import orders as order_service
 
 router = APIRouter(prefix="/me", tags=["Salesman Mobile"])
 
-ALLOW_SALESMAN = require_roles(UserRole.SALESMAN, UserRole.ADMIN)
+ALLOW_SALESMAN = require_roles(UserRole.SALESMAN)
 
 
 @router.get("/customers", response_model=list[SalesmanCustomerResponse], dependencies=[Depends(ALLOW_SALESMAN)])

@@ -33,14 +33,21 @@ interface NavItemConfig {
 }
 
 const ALL_NAV_ITEMS: NavItemConfig[] = [
-  { label: 'Dashboard', to: '/', icon: LayoutDashboard, roles: ['OWNER', 'ADMIN', 'ACCOUNTANT'] },
-  { label: 'New Order', to: '/orders/new', icon: Plus, roles: ['SALESMAN', 'OWNER', 'ADMIN'] },
-  { label: 'My Orders', to: '/orders/my', icon: ShoppingCart, roles: ['SALESMAN', 'OWNER', 'ADMIN'] },
-  { label: 'Stock', to: '/stock', icon: Boxes, roles: ['OWNER', 'ADMIN', 'PRODUCTION'] },
-  { label: 'Production', to: '/production', icon: Factory, roles: ['OWNER', 'ADMIN', 'PRODUCTION'] },
-  { label: 'Receivables', to: '/receivables', icon: CreditCard, roles: ['OWNER', 'ADMIN', 'ACCOUNTANT'] },
-  { label: 'Reports', to: '/reports', icon: FileSpreadsheet, roles: ['OWNER', 'ADMIN', 'ACCOUNTANT'] },
-  { label: 'Settings', to: '/settings', icon: Settings, roles: ['ADMIN'] },
+  // OWNER
+  { label: 'Overview', to: '/', icon: LayoutDashboard, roles: ['OWNER'] },
+  // ADMIN
+  { label: 'Orders', to: '/orders', icon: ShoppingCart, roles: ['ADMIN'] },
+  { label: 'Stock', to: '/stock', icon: Boxes, roles: ['ADMIN'] },
+  { label: 'Production', to: '/production', icon: Factory, roles: ['ADMIN'] },
+  // PRODUCTION
+  { label: 'Production', to: '/production', icon: Factory, roles: ['PRODUCTION'] },
+  { label: 'Stock', to: '/stock', icon: Boxes, roles: ['PRODUCTION'] },
+  // ACCOUNTANT
+  { label: 'Reports', to: '/reports', icon: FileSpreadsheet, roles: ['ACCOUNTANT'] },
+  { label: 'Receivables', to: '/receivables', icon: CreditCard, roles: ['ACCOUNTANT'] },
+  // SALESMAN
+  { label: 'New Order', to: '/orders/new', icon: Plus, roles: ['SALESMAN'] },
+  { label: 'My Orders', to: '/orders/my', icon: ShoppingCart, roles: ['SALESMAN'] },
 ];
 
 export const AppShell: React.FC = () => {

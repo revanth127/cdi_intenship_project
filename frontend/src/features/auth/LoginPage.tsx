@@ -5,39 +5,104 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Factory, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
 
+interface DemoRoleConfig {
+  role: 'OWNER' | 'ADMIN' | 'PRODUCTION' | 'ACCOUNTANT' | 'SALESMAN';
+  title: string;
+  email: string;
+  password: string;
+  access: string;
+}
+
+const DEMO_ROLES: DemoRoleConfig[] = [
+  {
+    role: 'OWNER',
+    title: 'Owner',
+    email: 'owner@foodmfr.local',
+    password: 'OwnerPass123!',
+    access: 'Executive metrics, costing margins, variances & receivables',
+  },
+  {
+    role: 'ADMIN',
+    title: 'Admin',
+    email: 'admin@foodmfr.local',
+    password: 'AdminPass123!',
+    access: 'System master data, user accounts & order approvals',
+  },
+  {
+    role: 'PRODUCTION',
+    title: 'Production',
+    email: 'production@foodmfr.local',
+    password: 'ProdPass123!',
+    access: 'Batch run logging, ingredient consumption & yield tracking',
+  },
+  {
+    role: 'ACCOUNTANT',
+    title: 'Accountant',
+    email: 'accountant@foodmfr.local',
+    password: 'AcctPass123!',
+    access: 'GST invoices, payment entries, receivables ageing & reports',
+  },
+  {
+    role: 'SALESMAN',
+    title: 'Salesman',
+    email: 'salesman.a@foodmfr.local',
+    password: 'SalesPass123!',
+    access: 'Mobile offline field order booking & customer pricing',
+  },
+];
+
+const ROLE_HOME_PAGES: Record<string, string> = {
+  SALESMAN: '/orders/new',
+  ADMIN: '/orders',
+  PRODUCTION: '/production',
+  ACCOUNTANT: '/reports',
+  OWNER: '/',
+};
+
 export const LoginPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const returnUrl = searchParams.get('returnUrl') || '/';
+  const returnUrl = searchParams.get('returnUrl');
   const isExpired = searchParams.get('expired') === 'true';
 
   const [email, setEmail] = useState('owner@foodmfr.local');
   const [password, setPassword] = useState('OwnerPass123!');
   const [error, setError] = useState<string | null>(null);
-  const { login, mockLoginAs, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
   const navigate = useNavigate();
 
-  // Demo mode flag from env (default true for evaluation)
-  const isDemoMode = import.meta.env.VITE_DEMO_MODE !== 'false';
+  // Demo mode flag from env (visible only when VITE_DEMO_MODE=true)
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
       await login(email, password);
-      navigate(returnUrl);
+      // Determine landing page based on authenticated user's role
+      const stored = sessionStorage.getItem('user_profile') || localStorage.getItem('user_profile');
+      let targetPath = '/';
+      if (stored) {
+        try {
+          const userObj = JSON.parse(stored);
+          targetPath = ROLE_HOME_PAGES[userObj.role] || '/';
+        } catch {
+          // fallback
+        }
+      }
+      navigate(returnUrl && returnUrl !== '/' && returnUrl !== '/login' ? returnUrl : targetPath);
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
     }
   };
 
-  const handleQuickLogin = (role: 'OWNER' | 'ADMIN' | 'SALESMAN' | 'PRODUCTION' | 'ACCOUNTANT') => {
-    mockLoginAs(role);
-    navigate('/');
+  const handleSelectRole = (r: DemoRoleConfig) => {
+    setEmail(r.email);
+    setPassword(r.password);
   };
 
   return (
     <div className="min-h-screen bg-page flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-md">
         {/* Brand Header */}
         <div className="flex items-center gap-2 mb-6 justify-center">
           <div className="w-8 h-8 rounded-[6px] bg-accent flex items-center justify-center text-white">
@@ -115,48 +180,33 @@ export const LoginPage: React.FC = () => {
               </Button>
             </form>
 
-            {/* Test Logins Block (Only visible in Demo Mode via env flag) */}
+            {/* Test Logins Block (Visible only when VITE_DEMO_MODE=true) */}
             {isDemoMode && (
-              <div className="mt-6 pt-5 border-t border-border">
+              <div className="mt-6 pt-5 border-t border-border" data-testid="demo-mode-section">
                 <div className="flex items-center gap-1.5 mb-2.5">
                   <UserCheck className="w-3.5 h-3.5 text-text-muted" />
                   <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
                     Demo Mode Logins
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('OWNER')}
-                    className="px-2.5 py-1.5 text-left text-xs rounded-[4px] border border-border hover:bg-surface-subtle transition-colors"
-                  >
-                    <div className="font-semibold text-text-primary">Owner</div>
-                    <div className="text-[11px] text-text-muted">Executive access</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('ADMIN')}
-                    className="px-2.5 py-1.5 text-left text-xs rounded-[4px] border border-border hover:bg-surface-subtle transition-colors"
-                  >
-                    <div className="font-semibold text-text-primary">Admin</div>
-                    <div className="text-[11px] text-text-muted">Full system control</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('SALESMAN')}
-                    className="px-2.5 py-1.5 text-left text-xs rounded-[4px] border border-border hover:bg-surface-subtle transition-colors"
-                  >
-                    <div className="font-semibold text-text-primary">Salesman</div>
-                    <div className="text-[11px] text-text-muted">Test 403 guard</div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('PRODUCTION')}
-                    className="px-2.5 py-1.5 text-left text-xs rounded-[4px] border border-border hover:bg-surface-subtle transition-colors"
-                  >
-                    <div className="font-semibold text-text-primary">Production</div>
-                    <div className="text-[11px] text-text-muted">Batch run logging</div>
-                  </button>
+                <div className="space-y-2">
+                  {DEMO_ROLES.map((r) => (
+                    <button
+                      key={r.role}
+                      type="button"
+                      onClick={() => handleSelectRole(r)}
+                      data-testid={`demo-role-${r.role.toLowerCase()}`}
+                      className="w-full p-2.5 text-left text-xs rounded-[4px] border border-border hover:bg-surface-subtle transition-colors flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-text-primary">{r.title}</span>
+                      </div>
+                      <div className="text-[11px] text-text-secondary mt-0.5">{r.access}</div>
+                      <div className="text-[10px] text-text-muted font-mono mt-1 pt-1 border-t border-border/50">
+                        {r.email} • {r.password}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}

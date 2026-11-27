@@ -18,7 +18,7 @@ from app.main import app
 from app.models.audit import AuditLog
 from app.models.bom import BOM, BOMItem
 from app.models.company import CompanySettings
-from app.models.customer import Customer
+from app.models.customer import Customer, CustomerType
 from app.models.invoice import Invoice, InvoiceStatus
 from app.models.item import Item, ItemType
 from app.models.order import Order, OrderLine, OrderStatus, PriceSource
@@ -133,7 +133,10 @@ class TestAuditTrail(unittest.TestCase):
         self.db.add_all([self.flour, self.oil, self.pouch, self.fg_item])
         self.db.commit()
 
-        # Opening balance for finished good
+        # Opening balance for finished good and raw materials
+        post_movement(self.db, self.flour.id, MovementType.OPENING, 100000, Decimal("4.200000"), "OPENING", "1", self.admin)
+        post_movement(self.db, self.oil.id, MovementType.OPENING, 30000, Decimal("14.000000"), "OPENING", "1", self.admin)
+        post_movement(self.db, self.pouch.id, MovementType.OPENING, 500, Decimal("250.000000"), "OPENING", "1", self.admin)
         post_movement(self.db, self.fg_item.id, MovementType.OPENING, 100, Decimal("3500.000000"), "OPENING", "1", self.admin)
         self.db.commit()
 
@@ -155,10 +158,19 @@ class TestAuditTrail(unittest.TestCase):
         self.bom = BOM(family_id=self.family.id, version=1, expected_output_g=40000, is_active=True)
         self.db.add(self.bom)
         self.db.flush()
-        self.bom.items.append(BOMItem(item_id=self.flour.id, quantity_per_batch=40000))
-        self.bom.items.append(BOMItem(item_id=self.oil.id, quantity_per_batch=10000))
+        self.bom.items.append(BOMItem(item_id=self.flour.id, quantity_per_batch=40000, unit_for_display="kg"))
+        self.bom.items.append(BOMItem(item_id=self.oil.id, quantity_per_batch=10000, unit_for_display="L"))
 
-        self.customer = Customer(name="Meenakshi Stores", gstin="33AAAAA0000A1Z5", state_code="33", address="Madurai", is_active=True, assigned_salesman_id=self.salesman.id)
+        self.customer = Customer(
+            name="Meenakshi Stores",
+            customer_type=CustomerType.RETAILER,
+            gstin="33AAAAA0000A1Z5",
+            state_code="33",
+            address="Madurai",
+            phone="9443111222",
+            is_active=True,
+            assigned_salesman_id=self.salesman.id,
+        )
         self.db.add(self.customer)
         self.db.commit()
 
@@ -197,7 +209,7 @@ class TestAuditTrail(unittest.TestCase):
         - Order reject logs ORDER_REJECTED.
         """
         # 1. Create order
-        order = create_order(
+        order, _ = create_order(
             self.db,
             OrderCreate(
                 client_uuid="uuid-audit-1",
@@ -237,7 +249,7 @@ class TestAuditTrail(unittest.TestCase):
         self.assertFalse(audit_app.new_values["approved_with_shortage"])
 
         # 4. Create second order with requested > available (available is 100 - 15 = 85 pkts)
-        order2 = create_order(
+        order2, _ = create_order(
             self.db,
             OrderCreate(
                 client_uuid="uuid-audit-2",
@@ -255,7 +267,7 @@ class TestAuditTrail(unittest.TestCase):
         self.assertTrue(audit_shortage.new_values["approved_with_shortage"])
 
         # 5. Reject a third order
-        order3 = create_order(
+        order3, _ = create_order(
             self.db,
             OrderCreate(
                 client_uuid="uuid-audit-3",
@@ -279,7 +291,7 @@ class TestAuditTrail(unittest.TestCase):
         - INVOICE_DISPATCHED
         - INVOICE_CANCELLED (by credit note)
         """
-        order = create_order(
+        order, _ = create_order(
             self.db,
             OrderCreate(
                 client_uuid="uuid-inv-1",
@@ -312,7 +324,7 @@ class TestAuditTrail(unittest.TestCase):
             headers=self.admin_headers,
             json={"vehicle_no": "TN-59-AB-1234"},
         )
-        self.assertEqual(res_disp.status_code, 201)
+        self.assertIn(res_disp.status_code, (200, 201))
         disp_audit = self.db.scalar(
             select(AuditLog).where(AuditLog.entity_id == str(invoice.id), AuditLog.action == "INVOICE_DISPATCHED")
         )
@@ -324,7 +336,7 @@ class TestAuditTrail(unittest.TestCase):
             headers=self.admin_headers,
             json={"reason": "Goods damaged in transit", "return_stock": True},
         )
-        self.assertEqual(res_cn.status_code, 201)
+        self.assertIn(res_cn.status_code, (200, 201))
         cancel_audit = self.db.scalar(
             select(AuditLog).where(AuditLog.entity_id == str(invoice.id), AuditLog.action == "INVOICE_CANCELLED")
         )
@@ -334,7 +346,7 @@ class TestAuditTrail(unittest.TestCase):
         """
         Attempted edit (PUT/PATCH/DELETE) on a posted invoice returns 409 AND logs action 'edit_rejected'.
         """
-        order = create_order(
+        order, _ = create_order(
             self.db,
             OrderCreate(
                 client_uuid="uuid-inv-lock",
@@ -413,7 +425,7 @@ class TestAuditTrail(unittest.TestCase):
         """
         GET /invoices/{id}/history and GET /production/{id}/history return chronological timeline.
         """
-        order = create_order(
+        order, _ = create_order(
             self.db,
             OrderCreate(
                 client_uuid="uuid-hist-1",

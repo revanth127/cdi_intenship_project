@@ -224,7 +224,7 @@ def get_invoice_share_link(
         action="INVOICE_SHARED",
         entity_type="Invoice",
         entity_id=str(invoice.id),
-        new_values={"expires_hours": expires_hours, "share_url": res.share_url},
+        new_values={"expires_hours": expires_hours, "share_url": res.get("share_url") if isinstance(res, dict) else getattr(res, "share_url", None)},
     )
     db.commit()
     return res

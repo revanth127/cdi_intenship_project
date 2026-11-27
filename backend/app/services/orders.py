@@ -566,9 +566,9 @@ def approve_order(
             "approved_with_shortage": bool(shortages),
             "shortages": [
                 {
-                    "product_id": s.product_id,
-                    "product_name": s.product_name,
-                    "shortage": s.shortage,
+                    "product_id": s.get("product_id") if isinstance(s, dict) else getattr(s, "product_id", None),
+                    "product_name": s.get("product_name") if isinstance(s, dict) else getattr(s, "product_name", None),
+                    "shortage": s.get("shortage") if isinstance(s, dict) else getattr(s, "shortage", None),
                 }
                 for s in shortages
             ] if shortages else [],

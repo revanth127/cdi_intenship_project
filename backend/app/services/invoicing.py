@@ -249,6 +249,7 @@ def create_invoice_from_order(db: Session, order_id: int, user: User) -> Invoice
     invoice.grand_total_paise = taxable_total + cgst_total + sgst_total + igst_total
 
     db.add(invoice)
+    db.flush()
 
     # 6. Advance Order Status to INVOICED
     from_status = order.status

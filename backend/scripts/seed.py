@@ -29,6 +29,75 @@ from app.models.user import User, UserRole
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("seed")
 
+# ------------------------------------------------------------------------------
+# DEMO USER CREDENTIALS CONFIGURATION
+# Defined in ONE place for deterministic evaluation across all 5 roles.
+# ------------------------------------------------------------------------------
+DEMO_CREDENTIALS = [
+    {
+        "role": UserRole.OWNER,
+        "role_name": "OWNER",
+        "email": "owner@foodmfr.local",
+        "name": "Senthil Nathan (Owner)",
+        "password": "OwnerPass123!",
+        "access": "Executive Overview, costing margins, variance alerts, receivables & telemetry",
+    },
+    {
+        "role": UserRole.ADMIN,
+        "role_name": "ADMIN",
+        "email": "admin@foodmfr.local",
+        "name": "System Administrator",
+        "password": "AdminPass123!",
+        "access": "Full system configuration, user accounts, master data & order approval",
+    },
+    {
+        "role": UserRole.PRODUCTION,
+        "role_name": "PRODUCTION",
+        "email": "production@foodmfr.local",
+        "name": "Production Supervisor",
+        "password": "ProdPass123!",
+        "access": "BOM management, production batch logging, consumption & variance alerts",
+    },
+    {
+        "role": UserRole.ACCOUNTANT,
+        "role_name": "ACCOUNTANT",
+        "email": "accountant@foodmfr.local",
+        "name": "Chief Accountant",
+        "password": "AcctPass123!",
+        "access": "GST Invoices, receivables ageing, payment allocations & audit reports",
+    },
+    {
+        "role": UserRole.SALESMAN,
+        "role_name": "SALESMAN",
+        "email": "salesman.a@foodmfr.local",
+        "name": "Salesman A (Madurai)",
+        "password": "SalesPass123!",
+        "access": "Mobile offline field order booking & pricing catalog (Retailer A)",
+    },
+    {
+        "role": UserRole.SALESMAN,
+        "role_name": "SALESMAN",
+        "email": "salesman.b@foodmfr.local",
+        "name": "Salesman B (Bengaluru)",
+        "password": "SalesPass123!",
+        "access": "Mobile offline field order booking & pricing catalog (Distributor B)",
+    },
+]
+
+
+def print_credentials_table() -> None:
+    border = "=" * 105
+    header = f"{'ROLE':<12} | {'EMAIL':<28} | {'PASSWORD':<16} | {'ACCESS SUMMARY'}"
+    div = "-" * 105
+    print("\n" + border)
+    print("DEMO CREDENTIALS TABLE")
+    print(border)
+    print(header)
+    print(div)
+    for cred in DEMO_CREDENTIALS:
+        print(f"{cred['role_name']:<12} | {cred['email']:<28} | {cred['password']:<16} | {cred['access']}")
+    print(border + "\n")
+
 
 def seed_company_settings(db: Session) -> CompanySettings:
     """Seed or update company configuration (Tamil Nadu, state code 33)."""
@@ -58,54 +127,15 @@ def seed_company_settings(db: Session) -> CompanySettings:
 
 def seed_users(db: Session) -> dict[str, User]:
     """
-    Seed system users across the 5 core roles:
-    - ADMIN
+    Seed system users across the 5 core roles from DEMO_CREDENTIALS config:
     - OWNER
-    - SALESMAN (2 salesmen)
+    - ADMIN
     - PRODUCTION
     - ACCOUNTANT
+    - SALESMAN (Salesman A & Salesman B)
     """
-    user_definitions = [
-        {
-            "email": "admin@foodmfr.local",
-            "name": "System Administrator",
-            "role": UserRole.ADMIN,
-            "password": os.getenv("SEED_ADMIN_PASSWORD", "AdminPassword123!"),
-        },
-        {
-            "email": "owner@foodmfr.local",
-            "name": "Senthil Nathan (Owner)",
-            "role": UserRole.OWNER,
-            "password": os.getenv("SEED_OWNER_PASSWORD", "OwnerPassword123!"),
-        },
-        {
-            "email": "salesman.a@foodmfr.local",
-            "name": "Salesman A (Madurai)",
-            "role": UserRole.SALESMAN,
-            "password": os.getenv("SEED_SALESMAN_PASSWORD", "SalesmanPassword123!"),
-        },
-        {
-            "email": "salesman.b@foodmfr.local",
-            "name": "Salesman B (Bengaluru)",
-            "role": UserRole.SALESMAN,
-            "password": os.getenv("SEED_SALESMAN_PASSWORD", "SalesmanPassword123!"),
-        },
-        {
-            "email": "production@foodmfr.local",
-            "name": "Production Supervisor",
-            "role": UserRole.PRODUCTION,
-            "password": os.getenv("SEED_PRODUCTION_PASSWORD", "ProductionPassword123!"),
-        },
-        {
-            "email": "accountant@foodmfr.local",
-            "name": "Chief Accountant",
-            "role": UserRole.ACCOUNTANT,
-            "password": os.getenv("SEED_ACCOUNTANT_PASSWORD", "AccountantPassword123!"),
-        },
-    ]
-
     user_map = {}
-    for u_data in user_definitions:
+    for u_data in DEMO_CREDENTIALS:
         stmt = select(User).where(User.email == u_data["email"])
         user = db.scalar(stmt)
         hashed_pwd = get_password_hash(u_data["password"])
@@ -502,6 +532,7 @@ def run_seed(db: Session | None = None) -> None:
         seed_opening_stock_movements(db, items, users["admin@foodmfr.local"])
         db.commit()
         logger.info("Master data seeding completed successfully!")
+        print_credentials_table()
     except Exception as exc:
         db.rollback()
         logger.error("Seeding failed: %s", exc)

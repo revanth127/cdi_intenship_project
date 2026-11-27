@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider } from '@/features/auth/AuthContext';
+import { AuthProvider, useAuth } from '@/features/auth/AuthContext';
 import { RoleGuard } from '@/features/auth/RoleGuard';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { AppShell } from '@/app/AppShell';
@@ -26,6 +26,17 @@ const PlaceholderModule: React.FC<{ title: string; subtitle: string }> = ({ titl
   </div>
 );
 
+// Dynamic landing page router directing each role to its dedicated home view
+const RoleLanding: React.FC = () => {
+  const { user } = useAuth();
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'SALESMAN') return <Navigate to="/orders/new" replace />;
+  if (user.role === 'ADMIN') return <Navigate to="/orders" replace />;
+  if (user.role === 'PRODUCTION') return <Navigate to="/production" replace />;
+  if (user.role === 'ACCOUNTANT') return <Navigate to="/reports" replace />;
+  return <OwnerDashboardPage />;
+};
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -43,20 +54,40 @@ export default function App() {
                 </RoleGuard>
               }
             >
-              {/* Executive Dashboard: Strictly restricted to OWNER, ADMIN, ACCOUNTANT */}
+              {/* Home page for each role:
+                  - salesman: New order (/orders/new)
+                  - admin: Orders (/orders)
+                  - production: Production (/production)
+                  - accountant: Reports (/reports)
+                  - owner: Overview (/)
+              */}
+              <Route index element={<RoleLanding />} />
+
+              {/* Salesman Field Order Routes */}
               <Route
-                index
+                path="orders"
                 element={
-                  <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'ACCOUNTANT']}>
-                    <OwnerDashboardPage />
+                  <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'SALESMAN']}>
+                    <SalesmanOrdersList />
                   </RoleGuard>
                 }
               />
-
-              {/* Salesman Field Order Routes */}
-              <Route path="orders" element={<SalesmanOrdersList />} />
-              <Route path="orders/my" element={<SalesmanOrdersList />} />
-              <Route path="orders/new" element={<SalesmanOrderPage />} />
+              <Route
+                path="orders/my"
+                element={
+                  <RoleGuard allowedRoles={['SALESMAN', 'OWNER', 'ADMIN']}>
+                    <SalesmanOrdersList />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="orders/new"
+                element={
+                  <RoleGuard allowedRoles={['SALESMAN', 'OWNER', 'ADMIN']}>
+                    <SalesmanOrderPage />
+                  </RoleGuard>
+                }
+              />
 
               {/* Operations & Auditing Routes */}
               <Route
