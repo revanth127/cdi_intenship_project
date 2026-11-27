@@ -54,6 +54,14 @@ class TestDemoRolesAndRBAC(unittest.TestCase):
 
     def test_all_seeded_users_can_log_in(self):
         """Verify each seeded user can log in via /auth/login with configured demo password."""
+        demo_response = self.client.get("/auth/demo-credentials")
+        self.assertEqual(demo_response.status_code, status.HTTP_200_OK)
+        demo_logins = demo_response.json()
+        self.assertEqual([entry["title"] for entry in demo_logins], [
+            "Owner", "Admin", "Production", "Accountant", "Salesman"
+        ])
+        self.assertEqual(len({entry["email"] for entry in demo_logins}), 5)
+
         for cred in DEMO_CREDENTIALS:
             resp = self.client.post(
                 "/auth/login",

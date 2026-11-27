@@ -12,10 +12,32 @@ from app.core.security import (
     verify_password,
 )
 from app.models.user import User
-from app.schemas.token import RefreshTokenRequest, Token
+from app.schemas.token import DemoLoginCredential, RefreshTokenRequest, Token
 from app.schemas.user import UserResponse
+from scripts.seed import DEMO_CREDENTIALS
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+
+@router.get("/demo-credentials", response_model=list[DemoLoginCredential])
+def get_demo_credentials():
+    """Expose the single-source demo login configuration for the opt-in login page."""
+    seen_roles: set[str] = set()
+    credentials = []
+    for credential in DEMO_CREDENTIALS:
+        role_name = credential["role_name"]
+        if role_name in seen_roles:
+            continue
+        seen_roles.add(role_name)
+        credentials.append(
+            DemoLoginCredential(
+                title=role_name.capitalize(),
+                email=credential["email"],
+                password=credential["password"],
+                access=credential["access"],
+            )
+        )
+    return credentials
 
 
 @router.post("/login", response_model=Token, summary="OAuth2 password login returning JWT access and refresh tokens")

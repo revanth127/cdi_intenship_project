@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -7,13 +7,34 @@ import { AppShell } from '@/app/AppShell';
 import * as AuthContextModule from '../AuthContext';
 
 describe('Part 2: Demo Logins & Role Views', () => {
+  const demoCredentials = [
+    { title: 'Owner', email: 'owner@foodmfr.local', password: 'OwnerPass123!', access: 'Executive Overview, costing margins, variance alerts, receivables & telemetry' },
+    { title: 'Admin', email: 'admin@foodmfr.local', password: 'AdminPass123!', access: 'Full system configuration, user accounts, master data & order approval' },
+    { title: 'Production', email: 'production@foodmfr.local', password: 'ProdPass123!', access: 'BOM management, production batch logging, consumption & variance alerts' },
+    { title: 'Accountant', email: 'accountant@foodmfr.local', password: 'AcctPass123!', access: 'GST Invoices, receivables ageing, payment allocations & audit reports' },
+    { title: 'Salesman', email: 'salesman.a@foodmfr.local', password: 'SalesPass123!', access: 'Mobile offline field order booking & pricing catalog (Retailer A)' },
+  ];
+
   beforeEach(() => {
     vi.stubEnv('VITE_DEMO_MODE', 'true');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => ({
+      ok: input.toString().includes('/auth/demo-credentials'),
+      status: input.toString().includes('/auth/demo-credentials') ? 200 : 404,
+      json: async () => input.toString().includes('/auth/demo-credentials')
+        ? demoCredentials
+        : { detail: 'Not found' },
+    })));
     sessionStorage.clear();
     localStorage.clear();
   });
 
-  it('renders all five demo roles with one-line access descriptions and visible credentials, and removes "Test 403 guard"', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('renders all five seed-configured roles with visible credentials and removes "Test 403 guard"', async () => {
     vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
       user: null,
       isAuthenticated: false,
@@ -30,7 +51,7 @@ describe('Part 2: Demo Logins & Role Views', () => {
     );
 
     // Verify all five roles are shown
-    expect(screen.getByTestId('demo-role-owner')).toBeInTheDocument();
+    expect(await screen.findByTestId('demo-role-owner')).toBeInTheDocument();
     expect(screen.getByTestId('demo-role-admin')).toBeInTheDocument();
     expect(screen.getByTestId('demo-role-production')).toBeInTheDocument();
     expect(screen.getByTestId('demo-role-accountant')).toBeInTheDocument();
@@ -40,14 +61,19 @@ describe('Part 2: Demo Logins & Role Views', () => {
     expect(screen.queryByText(/Test 403 guard/i)).not.toBeInTheDocument();
 
     // Verify credentials visible as small text
-    expect(screen.getByText(/owner@foodmfr\.local • OwnerPass123!/i)).toBeInTheDocument();
-    expect(screen.getByText(/admin@foodmfr\.local • AdminPass123!/i)).toBeInTheDocument();
-    expect(screen.getByText(/production@foodmfr\.local • ProdPass123!/i)).toBeInTheDocument();
-    expect(screen.getByText(/accountant@foodmfr\.local • AcctPass123!/i)).toBeInTheDocument();
-    expect(screen.getByText(/salesman\.a@foodmfr\.local • SalesPass123!/i)).toBeInTheDocument();
+    expect(screen.getByText('Email: owner@foodmfr.local')).toBeInTheDocument();
+    expect(screen.getByText('Password: OwnerPass123!')).toBeInTheDocument();
+    expect(screen.getByText('Email: admin@foodmfr.local')).toBeInTheDocument();
+    expect(screen.getByText('Password: AdminPass123!')).toBeInTheDocument();
+    expect(screen.getByText('Email: production@foodmfr.local')).toBeInTheDocument();
+    expect(screen.getByText('Password: ProdPass123!')).toBeInTheDocument();
+    expect(screen.getByText('Email: accountant@foodmfr.local')).toBeInTheDocument();
+    expect(screen.getByText('Password: AcctPass123!')).toBeInTheDocument();
+    expect(screen.getByText('Email: salesman.a@foodmfr.local')).toBeInTheDocument();
+    expect(screen.getByText('Password: SalesPass123!')).toBeInTheDocument();
   });
 
-  it('clicking a demo role fills the email and password form fields', () => {
+  it('clicking a demo role fills the email and password form fields', async () => {
     vi.spyOn(AuthContextModule, 'useAuth').mockReturnValue({
       user: null,
       isAuthenticated: false,
@@ -67,7 +93,7 @@ describe('Part 2: Demo Logins & Role Views', () => {
     const passwordInput = screen.getByPlaceholderText('••••••••') as HTMLInputElement;
 
     // Click Accountant role
-    fireEvent.click(screen.getByTestId('demo-role-accountant'));
+    fireEvent.click(await screen.findByTestId('demo-role-accountant'));
     expect(emailInput.value).toBe('accountant@foodmfr.local');
     expect(passwordInput.value).toBe('AcctPass123!');
 

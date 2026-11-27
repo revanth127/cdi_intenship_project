@@ -1,55 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { apiClient } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Factory, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
 
 interface DemoRoleConfig {
-  role: 'OWNER' | 'ADMIN' | 'PRODUCTION' | 'ACCOUNTANT' | 'SALESMAN';
   title: string;
   email: string;
   password: string;
   access: string;
 }
-
-const DEMO_ROLES: DemoRoleConfig[] = [
-  {
-    role: 'OWNER',
-    title: 'Owner',
-    email: 'owner@foodmfr.local',
-    password: 'OwnerPass123!',
-    access: 'Executive metrics, costing margins, variances & receivables',
-  },
-  {
-    role: 'ADMIN',
-    title: 'Admin',
-    email: 'admin@foodmfr.local',
-    password: 'AdminPass123!',
-    access: 'System master data, user accounts & order approvals',
-  },
-  {
-    role: 'PRODUCTION',
-    title: 'Production',
-    email: 'production@foodmfr.local',
-    password: 'ProdPass123!',
-    access: 'Batch run logging, ingredient consumption & yield tracking',
-  },
-  {
-    role: 'ACCOUNTANT',
-    title: 'Accountant',
-    email: 'accountant@foodmfr.local',
-    password: 'AcctPass123!',
-    access: 'GST invoices, payment entries, receivables ageing & reports',
-  },
-  {
-    role: 'SALESMAN',
-    title: 'Salesman',
-    email: 'salesman.a@foodmfr.local',
-    password: 'SalesPass123!',
-    access: 'Mobile offline field order booking & customer pricing',
-  },
-];
 
 const ROLE_HOME_PAGES: Record<string, string> = {
   SALESMAN: '/orders/new',
@@ -64,14 +26,33 @@ export const LoginPage: React.FC = () => {
   const returnUrl = searchParams.get('returnUrl');
   const isExpired = searchParams.get('expired') === 'true';
 
-  const [email, setEmail] = useState('owner@foodmfr.local');
-  const [password, setPassword] = useState('OwnerPass123!');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [demoRoles, setDemoRoles] = useState<DemoRoleConfig[]>([]);
+  const [demoCredentialsError, setDemoCredentialsError] = useState<string | null>(null);
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
 
   // Demo mode flag from env (visible only when VITE_DEMO_MODE=true)
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+
+  useEffect(() => {
+    if (!isDemoMode) return;
+
+    let active = true;
+    apiClient.get<DemoRoleConfig[]>('/auth/demo-credentials')
+      .then((credentials) => {
+        if (active) setDemoRoles(credentials);
+      })
+      .catch((requestError: Error) => {
+        if (active) setDemoCredentialsError(requestError.message);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isDemoMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,9 +76,9 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleSelectRole = (r: DemoRoleConfig) => {
-    setEmail(r.email);
-    setPassword(r.password);
+  const handleSelectRole = (role: DemoRoleConfig) => {
+    setEmail(role.email);
+    setPassword(role.password);
   };
 
   return (
@@ -190,12 +171,20 @@ export const LoginPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="space-y-2">
-                  {DEMO_ROLES.map((r) => (
+                  {demoCredentialsError && (
+                    <p className="text-xs text-status-breach-text" role="alert">
+                      Could not load demo credentials: {demoCredentialsError}
+                    </p>
+                  )}
+                  {!demoCredentialsError && demoRoles.length === 0 && (
+                    <p className="text-xs text-text-muted">Loading demo credentials...</p>
+                  )}
+                  {demoRoles.map((r) => (
                     <button
-                      key={r.role}
+                      key={r.title}
                       type="button"
                       onClick={() => handleSelectRole(r)}
-                      data-testid={`demo-role-${r.role.toLowerCase()}`}
+                      data-testid={`demo-role-${r.title.toLowerCase()}`}
                       className="w-full p-2.5 text-left text-xs rounded-[4px] border border-border hover:bg-surface-subtle transition-colors flex flex-col justify-between"
                     >
                       <div className="flex items-center justify-between">
@@ -203,7 +192,8 @@ export const LoginPage: React.FC = () => {
                       </div>
                       <div className="text-[11px] text-text-secondary mt-0.5">{r.access}</div>
                       <div className="text-[10px] text-text-muted font-mono mt-1 pt-1 border-t border-border/50">
-                        {r.email} • {r.password}
+                        <div>Email: {r.email}</div>
+                        <div>Password: {r.password}</div>
                       </div>
                     </button>
                   ))}
