@@ -340,28 +340,29 @@ export const InvoicesPage: React.FC<{ isReadOnly?: boolean }> = ({ isReadOnly = 
               </p>
             </div>
 
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={downloadPdf}
+                disabled={isDownloading}
+                className="text-xs h-8 gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>{isDownloading ? 'Preparing…' : 'Download PDF'}</span>
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={fetchShareLink}
+                disabled={isLoadingShare}
+                className="text-xs h-8 gap-1.5"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>{isLoadingShare ? 'Creating link…' : 'Share on WhatsApp'}</span>
+              </Button>
             {!isReadOnly && (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={downloadPdf}
-                  disabled={isDownloading}
-                  className="text-xs h-8 gap-1.5"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{isDownloading ? 'Preparing…' : 'Download PDF'}</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={fetchShareLink}
-                  disabled={isLoadingShare}
-                  className="text-xs h-8 gap-1.5"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />
-                  <span>{isLoadingShare ? 'Creating link…' : 'Share on WhatsApp'}</span>
-                </Button>
+              <>
                 {!selectedInvoice.is_dispatched && selectedInvoice.status === 'POSTED' && (
                   <Button
                     variant="secondary"
@@ -382,8 +383,9 @@ export const InvoicesPage: React.FC<{ isReadOnly?: boolean }> = ({ isReadOnly = 
                   <FileMinus className="w-3.5 h-3.5" />
                   <span>Issue credit note</span>
                 </Button>
-              </div>
+              </>
             )}
+            </div>
           </div>
 
           {shareLink && (

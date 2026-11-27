@@ -14,6 +14,7 @@ import { ProductionOperationsPage } from '@/features/production/ProductionOperat
 import { AdminOrdersPage } from '@/features/admin/orders/AdminOrdersPage';
 import { InvoicesPage } from '@/features/admin/invoices/InvoicesPage';
 import { ReceivablesPage } from '@/features/admin/receivables/ReceivablesPage';
+import { ReportsPage } from '@/features/admin/reports/ReportsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,7 +60,7 @@ const RoleLanding: React.FC = () => {
   if (user.role === 'SALESMAN') return <Navigate to="/orders/new" replace />;
   if (user.role === 'ADMIN') return <Navigate to="/orders" replace />;
   if (user.role === 'PRODUCTION') return <Navigate to="/production" replace />;
-  if (user.role === 'ACCOUNTANT') return <Navigate to="/receivables" replace />;
+  if (user.role === 'ACCOUNTANT') return <Navigate to="/reports" replace />;
   return <OwnerDashboardPage />;
 };
 
@@ -84,7 +85,7 @@ export default function App() {
                   - salesman: New order (/orders/new)
                   - admin: Orders (/orders)
                   - production: Production (/production)
-                  - accountant: Receivables (/receivables)
+                  - accountant: Reports (/reports)
                   - owner: Overview (/)
               */}
               <Route index element={<RoleLanding />} />
@@ -159,11 +160,8 @@ export default function App() {
               <Route
                 path="reports"
                 element={
-                  <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'ACCOUNTANT']}>
-                    <PlaceholderModule
-                      title="Auditing & Tax Reports"
-                      subtitle="HSN summary, GSTR-1 preparation, and inventory valuation certificates."
-                    />
+                  <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'ACCOUNTANT', 'PRODUCTION']}>
+                    <ReportsPage />
                   </RoleGuard>
                 }
               />

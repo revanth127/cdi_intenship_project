@@ -20,6 +20,7 @@ from app.routers import (
     products,
     purchases,
     receivables,
+    reports,
     stock,
     suppliers,
     users,
@@ -70,4 +71,5 @@ api_router.include_router(costing.router)
 api_router.include_router(dashboard.router)
 
 # Audit Trail & History
+api_router.include_router(reports.router)
 api_router.include_router(audit.router)
