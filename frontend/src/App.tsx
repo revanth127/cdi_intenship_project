@@ -54,7 +54,7 @@ const ReceivablesRoute: React.FC = () => {
 };
 
 // Dynamic landing page router directing each role to its dedicated home view
-const RoleLanding: React.FC = () => {
+export const RoleLanding: React.FC = () => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'SALESMAN') return <Navigate to="/orders/new" replace />;
