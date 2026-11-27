@@ -147,8 +147,8 @@ Mapped to the internship task's **Section 6 scope tiers**. This inventory reflec
 ### Stretch goals (bonus once must-haves work) — picked
 
 - **Done — Offline order capture with sync** (IndexedDB outbox + sync engine + `client_uuid` idempotency).
-- **Done — Batch and expiry tracking** on stock movements (`batch_no`, `expiry_date`); **not** FEFO dispatch.
-- **Done — Reorder levels and low-stock alerts** (`items.reorder_level`, owner-dashboard low-stock, or lowest-5 fallback).
+- **Partial — Batch and expiry tracking**: `stock_movements.batch_no`/`expiry_date` columns + `post_movement()` args; **not** exposed via API/UI and **not** FEFO dispatch.
+- **Partial — Reorder levels and low-stock alerts**: `items.reorder_level` + owner-dashboard low-stock (falls back to lowest-5); setting reorder level is admin/master-data, not a dedicated alert screen.
 - **Done — Docker Compose development override**; **optional demo-volume seed** (not default).
 - **Not done** — production planning from pending orders ("to fulfil today's orders, make N batches"); salesman route/visit log + GPS check-in; **Tally-compatible export**; e-Invoice / e-Way Bill mock government API; Tamil-language floor-staff UI. See **Known gaps**.
 - **Not done** — hosted live link (`Hosted URL` to be added) and **demo video** (deliverable #4; not producible in-repo). Local `make up` / `make benchmark` works.
