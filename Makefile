@@ -21,10 +21,10 @@ help:
 	@echo "  make test-frontend  Run vitest frontend suite"
 
 benchmark:
-	DATABASE_URL=$${DATABASE_URL:-postgresql+psycopg2://postgres:postgres@localhost:5434/order_to_audit} $(PYTHON) scripts/run_benchmark.py
+	API_BASE_URL=$${API_BASE_URL:-http://localhost:8000/api/v1} $(PYTHON) scripts/run_benchmark.py
 
 demo-state:
-	DATABASE_URL=$${DATABASE_URL:-postgresql+psycopg2://postgres:postgres@localhost:5434/order_to_audit} $(PYTHON) scripts/apply_benchmark_state.py
+	API_BASE_URL=$${API_BASE_URL:-http://localhost:8000/api/v1} $(PYTHON) scripts/apply_benchmark_state.py
 
 test: test-backend test-frontend
 

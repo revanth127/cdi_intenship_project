@@ -11,8 +11,8 @@ Order-to-Audit is a business application for a food manufacturer to track orders
 - `frontend/src/app/` — routing and application shell.
 - `frontend/src/features/` — authentication, owner dashboard, and salesman order screens.
 - `frontend/src/lib/` — shared API and frontend utilities.
-- `scripts/apply_benchmark_state.py` — applies Section 5 transactions to the clean seed.
-- `scripts/run_benchmark.py` — Section 5 benchmark checks.
+- `scripts/apply_benchmark_state.py` — applies Section 5 transactions through the API.
+- `scripts/run_benchmark.py` — Section 5 HTTP workflow and result checks.
 - `scripts/seed_demo_volume.py` — optional extra demo data; not run by the default startup.
 - `docker-compose.yml` — default database, migration/seed, backend, and frontend services.
 - `docker-compose.dev.yml` — development reload and backend source mount.
@@ -40,13 +40,13 @@ To stop services and remove the seeded database volume:
 docker compose down -v
 ```
 
-The default database is intentionally clean for evaluators. To add the Section 5 transactions for screenshots, run this after Compose is up:
+The default database contains only master data and opening stock. It creates no purchases, production runs, orders, invoices, or payments. To apply the Section 5 transactions for screenshots, run this after Compose is up:
 
 ```sh
 make demo-state
 ```
 
-`make demo-state` is separate from startup; to return to a clean database, reset with `docker compose down -v` and start Compose again.
+`make demo-state` uses the same HTTP workflow as the benchmark but does not print the assertion table. Both commands require an untouched transaction database. To return to the clean seeded state, reset with `docker compose down -v` and start Compose again.
 
 To use the development override (backend reload and source mount):
 
@@ -129,7 +129,7 @@ The repository does not include the Section 6 rubric text, so the following is a
 
 ### Should-have
 
-- **Done** — Idempotent benchmark seed and an executable Section 5 benchmark.
+- **Partial** — HTTP-based Section 5 benchmark workflow is implemented; its clean-database end-to-end output is pending verification.
 - **Done** — Audit-oriented stock movements, order history, and invoice/credit-note domain workflows.
 - **Partial** — Role-restricted Production, Stock, Receivables, and Reports pages exist in the frontend shell but currently display placeholder content.
 - **Partial** — Salesman order flow supports offline-oriented client behavior; full offline synchronization coverage is not established by the repository's tests.
@@ -152,39 +152,32 @@ The repository does not include the Section 6 rubric text, so the following is a
 
 ## Section 5 benchmark
 
-With the clean database running, the benchmark creates the Section 5 transactions and checks their actual results. Run it once per reset:
+The database must be in the default master-data-only state. `make benchmark` logs in through the API as Owner, Admin, Production, Accountant, Salesman A, and Salesman B, executes Section 5 steps 1–9, and checks the results. It stops with `Reset with docker compose down -v` if it finds existing transactions; run it once per reset. The default API URL includes `/api/v1`; override it when needed:
 
 ```sh
 make benchmark
 ```
 
-The following values are expected from `scripts/run_benchmark.py` after it applies the Section 5 steps:
+```sh
+API_BASE_URL=http://localhost:8000/api/v1 make benchmark
+```
+
+`make demo-state` executes those same transactions through the API without the benchmark result table, for screenshots. It also requires a clean database. The values below are the expected checks; the fresh HTTP execution table will be recorded after a clean database run.
 
 | Check | Expected | Actual | Result |
 |---|---:|---:|---|
-| Flour post-purchase WAC | 4.312500 paise/g | 4.312500 paise/g | PASS |
-| Flour post-run inventory | 120.0 kg | 120.0 kg | PASS |
-| Cooking oil post-run inventory | 19.5 L | 19.5 L | PASS |
-| Spice mix post-run inventory | 3.8 kg | 3.8 kg | PASS |
-| 200 g pouch post-run inventory | 306 pieces | 306 pieces | PASS |
-| Carton post-run inventory | 21 pieces | 21 pieces | PASS |
-| Murukku 200 g finished stock after dispatch | 88 packets | 88 packets | PASS |
-| Production good-packet output | 188 packets | 188 packets | PASS |
-| Oil variance | +5.00% (Flagged) | +5.00% (Flagged) | PASS |
-| Carton variance | -10.00% (Flagged) | -10.00% (Flagged) | PASS |
-| Pouch variance | -3.00% (Not flagged) | -3.00% (Not flagged) | PASS |
-| Yield variance | -6.00% (Flagged) | -6.00% (Flagged) | PASS |
-| Run material cost | Rs 4,055.00 | Rs 4,055.00 | PASS |
-| Direct overheads (Labour + Gas) | Rs 1,800.00 | Rs 1,800.00 | PASS |
-| Total run cost | Rs 5,855.00 | Rs 5,855.00 | PASS |
-| Cost per packet (Weighted Average) | Rs 31.14 | Rs 31.14 | PASS |
-| Selling price per packet | Rs 50.00 | Rs 50.00 | PASS |
-| Gross commercial margin | 37.7% | 37.7% | PASS |
-| Retailer A invoice total (150 packets + 5% GST) | Rs 7,875.00 | Rs 7,875.00 | PASS |
-| Retailer A outstanding after Rs 4,000 payment | Rs 3,875.00 | Rs 3,875.00 | PASS |
-| Distributor B order shortage | Short by 32 packets | Short by 32 packets | PASS |
+| Owner, Admin, Production, Accountant, and both Salesmen log in | Six role-correct sessions | Pending clean HTTP run | Pending |
+| Flour after purchase, then production | 160 kg, then 120 kg | Pending clean HTTP run | Pending |
+| Finished goods after production, then dispatch | 238 packets, then 88 packets | Pending clean HTTP run | Pending |
+| Oil, spice, pouches, cartons after production | 19.5 L, 3.8 kg, 306, 21 | Pending clean HTTP run | Pending |
+| Yield, oil, carton, pouch variance | -6.00% flagged; +5.00% flagged; -10.00% flagged; -3.00% not flagged | Pending clean HTTP run | Pending |
+| Material cost and overheads | Rs 4,055.00 and Rs 1,800.00 | Pending clean HTTP run | Pending |
+| Total production cost, cost per packet, selling price, margin | Rs 5,855.00; Rs 31.14; Rs 50.00; 37.7% | Pending clean HTTP run | Pending |
+| Retailer A invoice | Rs 7,500.00 + Rs 187.50 CGST + Rs 187.50 SGST = Rs 7,875.00 | Pending clean HTTP run | Pending |
+| Retailer A outstanding after Rs 4,000 payment | Rs 3,875.00 | Pending clean HTTP run | Pending |
+| Distributor B order and IGST estimate | Short by 32 packets; Rs 300.00 IGST | Pending clean HTTP run | Pending |
 
-The valuation method is moving weighted average: material issues are valued at the moving weighted-average cost. All shift overheads (Labour Rs 1,200 and Gas Rs 600) are divided over the **188 good packets**; damaged or scrap packets do not absorb inventory value. The benchmark weighted-average result is **Rs 31.14 per packet**. The FIFO comparison in the benchmark script is **Rs 30.90 per packet**.
+The valuation method is moving weighted average: material issues are valued at the moving weighted-average cost. All shift overheads (Labour Rs 1,200 and Gas Rs 600) are divided over the **188 good packets**; damaged or scrap packets do not absorb inventory value. The expected weighted-average result is **Rs 31.14 per packet**. Under the FIFO alternative, using the earlier Rs 42/kg flour lot, the comparison is **Rs 30.90 per packet**.
 
 The benchmark has three variance alerts: oil at +5%, yield at -6%, and cartons at -10%. Pouches at -3.0% are not flagged because the threshold is strictly greater than 3%. Distributor B's submitted order is 120 packets while only 88 are available, so it is shown as a 32-packet shortage with an estimated inter-state GST (IGST) amount; it is not an invoice.
 
