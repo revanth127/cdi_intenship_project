@@ -22,14 +22,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.db import SessionLocal
+from app.models.company import CompanySettings
 from app.models.customer import Customer, CustomerType
-from app.models.invoice import Invoice, InvoiceLine, InvoiceStatus, Dispatch, DispatchStatus
+from app.models.invoice import Invoice, InvoiceLine, InvoiceStatus
 from app.models.item import Item
 from app.models.order import Order, OrderLine, OrderStatus
-from app.models.pricing import PriceList, PriceListItem
 from app.models.product import Product
-from app.models.user import User, UserRole
+from app.models.user import User
+from app.services.invoicing import get_next_invoice_number
+from app.services.orders import get_next_order_number
 from scripts.seed import run_seed
+from app.utils.gst import compute_line_tax, is_intra_state
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("seed_volume")
@@ -43,6 +46,10 @@ def seed_demo_volume(db: Session) -> None:
     salesman_b = db.scalar(select(User).where(User.email == "salesman.b@foodmfr.local"))
     admin = db.scalar(select(User).where(User.email == "admin@foodmfr.local"))
     product = db.scalar(select(Product).join(Item).where(Item.name == "Murukku 200 g"))
+    company = db.scalar(select(CompanySettings).where(CompanySettings.id == 1))
+    if not company or not product or not salesman_a or not salesman_b or not admin:
+        raise RuntimeError("The benchmark seed did not create the required company, product, or demo users.")
+    item = product.item
 
     # 2. Add extra customers
     extra_customers = [
@@ -74,57 +81,83 @@ def seed_demo_volume(db: Session) -> None:
     base_date = now - timedelta(days=28)
 
     # 3. Create historical daily sales across 28 days for rich sales trend
-    order_idx = 100
     for day_offset in range(0, 28, 2):
         inv_dt = base_date + timedelta(days=day_offset, hours=10)
         cust = cust_objs[day_offset % len(cust_objs)]
         pkts = 40 + (day_offset * 5) % 80
         taxable_paise = pkts * 5000
-        is_interstate = (cust.state_code != "33")
-        gst_rate = 500
-        gst_paise = (taxable_paise * gst_rate) // 10000
-        grand_total = taxable_paise + gst_paise
+        client_uuid = f"demo-volume-{day_offset:02d}"
+        if db.scalar(select(Order).where(Order.client_uuid == client_uuid)):
+            continue
 
-        inv_no = f"INV-VOL-{order_idx:04d}"
-        existing_inv = db.scalar(select(Invoice).where(Invoice.invoice_no == inv_no))
-        if not existing_inv:
-            order_idx += 1
-            ord_obj = Order(
-                order_no=f"ORD-VOL-{order_idx:04d}",
-                client_uuid=f"uuid-vol-{order_idx}",
-                customer_id=cust.id,
-                salesman_id=cust.assigned_salesman_id,
-                order_date=inv_dt,
-                status=OrderStatus.DISPATCHED,
-                total_amount_paise=grand_total,
+        intra_state = is_intra_state(company.state_code, cust.state_code)
+        cgst_paise, sgst_paise, igst_paise = compute_line_tax(
+            taxable_paise, item.gst_rate_bp, intra_state
+        )
+        grand_total = taxable_paise + cgst_paise + sgst_paise + igst_paise
+        order_no = get_next_order_number(db, inv_dt)
+        order = Order(
+            order_no=order_no,
+            client_uuid=client_uuid,
+            customer_id=cust.id,
+            salesman_id=cust.assigned_salesman_id,
+            order_date=inv_dt,
+            status=OrderStatus.INVOICED,
+            total_amount_paise=grand_total,
+        )
+        order.lines.append(
+            OrderLine(
+                product_id=product.id,
+                quantity_packets=pkts,
+                unit_price_paise=5000,
+                line_total_paise=taxable_paise,
             )
-            db.add(ord_obj)
-            db.flush()
+        )
+        db.add(order)
+        db.flush()
 
-            cgst_paise = 0 if is_interstate else gst_paise // 2
-            sgst_paise = 0 if is_interstate else gst_paise // 2
-            igst_paise = gst_paise if is_interstate else 0
-
-            inv_obj = Invoice(
-                invoice_no=inv_no,
-                order_id=ord_obj.id,
-                customer_id=cust.id,
-                financial_year="2026-2027",
-                invoice_date=inv_dt,
-                status=InvoiceStatus.POSTED,
-                taxable_total_paise=taxable_paise,
-                cgst_rate_bp=0 if is_interstate else 250,
+        invoice_no, financial_year = get_next_invoice_number(db, inv_dt)
+        invoice = Invoice(
+            invoice_no=invoice_no,
+            financial_year=financial_year,
+            invoice_date=inv_dt,
+            order_id=order.id,
+            customer_id=cust.id,
+            status=InvoiceStatus.POSTED,
+            seller_name=company.company_name,
+            seller_gstin=company.gstin,
+            seller_address=company.address,
+            seller_state_code=company.state_code,
+            buyer_name=cust.name,
+            buyer_gstin=cust.gstin,
+            buyer_address=cust.address,
+            buyer_state_code=cust.state_code,
+            place_of_supply_state_code=cust.state_code,
+            is_igst=not intra_state,
+            taxable_total_paise=taxable_paise,
+            cgst_total_paise=cgst_paise,
+            sgst_total_paise=sgst_paise,
+            igst_total_paise=igst_paise,
+            round_off_paise=0,
+            grand_total_paise=grand_total,
+            created_by=admin.id,
+        )
+        invoice.lines.append(
+            InvoiceLine(
+                product_id=product.id,
+                description=item.name,
+                hsn_code=item.hsn_code or "1905",
+                quantity_packets=pkts,
+                unit_price_paise=5000,
+                taxable_paise=taxable_paise,
+                gst_rate_bp=item.gst_rate_bp,
                 cgst_paise=cgst_paise,
-                sgst_rate_bp=0 if is_interstate else 250,
                 sgst_paise=sgst_paise,
-                igst_rate_bp=500 if is_interstate else 0,
                 igst_paise=igst_paise,
-                grand_total_paise=grand_total,
-                amount_paid_paise=grand_total // 2,
-                balance_due_paise=grand_total - (grand_total // 2),
+                line_total_paise=grand_total,
             )
-            db.add(inv_obj)
-            db.flush()
+        )
+        db.add(invoice)
 
     db.commit()
     logger.info("Successfully seeded high-volume demo records for multi-week dashboard analysis.")

@@ -138,12 +138,12 @@ The repository does not include the Section 6 rubric text, so the following is a
 - Item HSN codes are seeded as master data (for example, finished Murukku `2106`); tax treatment follows the item/customer/company state data.
 - Financial year starts in **April** and ends in **March**.
 - Invoice identifiers use the backend format `INV/YYYY-YY/NNNN` (for example, `INV/2026-27/0001`); order identifiers use `ORD-YYYY-NNNN`.
-- Amounts are represented in paise. Calculated tax and monetary amounts use the backend's decimal rounding rules.
+- Amounts are represented in paise. GST components are rounded independently to whole paise using `ROUND_HALF_UP`; other calculated money values use decimal half-up rounding.
 - Sales quantities for the benchmark finished product are measured in **packets**.
 
 ## Section 5 benchmark
 
-Run the real database checks with the Compose stack running:
+With backend dependencies installed and the Compose database running, run the real database checks:
 
 ```sh
 make benchmark
@@ -182,7 +182,7 @@ The benchmark has three variance alerts: oil at +5%, yield at -6%, and cartons a
 To add optional volume after starting the database, run:
 
 ```sh
-DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5434/order_to_audit python3 scripts/seed_demo_volume.py
+DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5434/order_to_audit backend/.venv/bin/python scripts/seed_demo_volume.py
 ```
 
 This is not part of the default Compose startup or the benchmark seed.
