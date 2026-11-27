@@ -13,7 +13,7 @@ router = APIRouter(prefix="/suppliers", tags=["Suppliers"])
 # RBAC Permissions:
 # Read: ADMIN, OWNER, ACCOUNTANT
 # Write: ADMIN
-ALLOW_READ = require_roles(UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT)
+ALLOW_READ = require_roles(UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT, UserRole.PRODUCTION)
 ALLOW_WRITE = require_roles(UserRole.ADMIN)
 
 

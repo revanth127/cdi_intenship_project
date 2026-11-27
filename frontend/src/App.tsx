@@ -8,6 +8,9 @@ import { AppShell } from '@/app/AppShell';
 import { OwnerDashboardPage } from '@/features/dashboard/OwnerDashboardPage';
 import { SalesmanOrderPage } from '@/features/salesman/SalesmanOrderPage';
 import { SalesmanOrdersList } from '@/features/salesman/SalesmanOrdersList';
+import { PurchasesPage } from '@/features/purchases/PurchasesPage';
+import { StockLedgerPage } from '@/features/stock/StockLedgerPage';
+import { ProductionOperationsPage } from '@/features/production/ProductionOperationsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -91,13 +94,18 @@ export default function App() {
 
               {/* Operations & Auditing Routes */}
               <Route
-                path="stock"
+                path="purchases"
                 element={
                   <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'PRODUCTION']}>
-                    <PlaceholderModule
-                      title="Stock Ledger"
-                      subtitle="Immutable inventory ledger movements, weighted average valuation, and batch balances."
-                    />
+                    <PurchasesPage />
+                  </RoleGuard>
+                }
+              />
+              <Route
+                path="stock"
+                element={
+                  <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'PRODUCTION', 'ACCOUNTANT']}>
+                    <StockLedgerPage />
                   </RoleGuard>
                 }
               />
@@ -105,10 +113,7 @@ export default function App() {
                 path="production"
                 element={
                   <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'PRODUCTION']}>
-                    <PlaceholderModule
-                      title="Production Operations"
-                      subtitle="Multi-pack BOM runs, actual consumption tracking, and yield variance flags."
-                    />
+                    <ProductionOperationsPage />
                   </RoleGuard>
                 }
               />

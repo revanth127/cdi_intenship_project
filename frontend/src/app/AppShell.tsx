@@ -16,6 +16,7 @@ import {
   RotateCcw,
   LogOut,
   Plus,
+  Truck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/components/ui/button';
@@ -37,14 +38,20 @@ const ALL_NAV_ITEMS: NavItemConfig[] = [
   { label: 'Overview', to: '/', icon: LayoutDashboard, roles: ['OWNER'] },
   // ADMIN
   { label: 'Orders', to: '/orders', icon: ShoppingCart, roles: ['ADMIN'] },
+  { label: 'Invoices', to: '/invoices', icon: FileSpreadsheet, roles: ['ADMIN'] },
+  { label: 'Receivables', to: '/receivables', icon: CreditCard, roles: ['ADMIN'] },
   { label: 'Stock', to: '/stock', icon: Boxes, roles: ['ADMIN'] },
   { label: 'Production', to: '/production', icon: Factory, roles: ['ADMIN'] },
+  { label: 'Purchases', to: '/purchases', icon: Truck, roles: ['ADMIN'] },
   // PRODUCTION
-  { label: 'Production', to: '/production', icon: Factory, roles: ['PRODUCTION'] },
+  { label: 'Purchases', to: '/purchases', icon: Truck, roles: ['PRODUCTION'] },
   { label: 'Stock', to: '/stock', icon: Boxes, roles: ['PRODUCTION'] },
+  { label: 'Production', to: '/production', icon: Factory, roles: ['PRODUCTION'] },
   // ACCOUNTANT
-  { label: 'Reports', to: '/reports', icon: FileSpreadsheet, roles: ['ACCOUNTANT'] },
   { label: 'Receivables', to: '/receivables', icon: CreditCard, roles: ['ACCOUNTANT'] },
+  { label: 'Invoices', to: '/invoices', icon: FileSpreadsheet, roles: ['ACCOUNTANT'] },
+  { label: 'Stock', to: '/stock', icon: Boxes, roles: ['ACCOUNTANT'] },
+  { label: 'Reports', to: '/reports', icon: FileSpreadsheet, roles: ['ACCOUNTANT'] },
   // SALESMAN
   { label: 'New Order', to: '/orders/new', icon: Plus, roles: ['SALESMAN'] },
   { label: 'My Orders', to: '/orders/my', icon: ShoppingCart, roles: ['SALESMAN'] },

@@ -17,7 +17,7 @@ from app.services import costing as costing_service
 
 router = APIRouter(prefix="/costing", tags=["Costing & Margins"])
 
-ALLOW_READ = require_roles(UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT)
+ALLOW_READ = require_roles(UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT, UserRole.PRODUCTION)
 
 
 @router.get("/runs/{run_id}", response_model=RunCostDetailResponse, dependencies=[Depends(ALLOW_READ)])

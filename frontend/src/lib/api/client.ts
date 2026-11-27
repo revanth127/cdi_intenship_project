@@ -281,6 +281,8 @@ export const apiClient = {
     request<T>(endpoint, { method: 'POST', body: body !== undefined ? JSON.stringify(body) : undefined, ...options }),
   put: <T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> =>
     request<T>(endpoint, { method: 'PUT', body: body !== undefined ? JSON.stringify(body) : undefined, ...options }),
+  patch: <T>(endpoint: string, body?: any, options?: RequestOptions): Promise<T> =>
+    request<T>(endpoint, { method: 'PATCH', body: body !== undefined ? JSON.stringify(body) : undefined, ...options }),
   delete: <T>(endpoint: string, options?: RequestOptions): Promise<T> =>
     request<T>(endpoint, { method: 'DELETE', ...options }),
 };
