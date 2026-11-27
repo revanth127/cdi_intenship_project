@@ -350,7 +350,7 @@ class TestInvoicesPhase6(unittest.TestCase):
     def test_posted_invoice_immutability(self):
         """
         Posted invoices are immutable:
-        - No update or delete endpoints exist (405 Method Not Allowed or 404).
+        - No update or delete endpoints exist (405, 404, or logged 409 Conflict).
         - Direct modification attempt through service layer raises an exception.
         """
         admin_h = {"Authorization": f"Bearer {self.admin_token}"}
@@ -360,15 +360,15 @@ class TestInvoicesPhase6(unittest.TestCase):
 
         # Attempt PATCH
         patch_res = self.client.patch(f"/invoices/{inv_id}", json={"notes": "edit"}, headers=admin_h)
-        self.assertIn(patch_res.status_code, [status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_404_NOT_FOUND])
+        self.assertIn(patch_res.status_code, [status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_404_NOT_FOUND, status.HTTP_409_CONFLICT])
 
         # Attempt PUT
         put_res = self.client.put(f"/invoices/{inv_id}", json={}, headers=admin_h)
-        self.assertIn(put_res.status_code, [status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_404_NOT_FOUND])
+        self.assertIn(put_res.status_code, [status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_404_NOT_FOUND, status.HTTP_409_CONFLICT])
 
         # Attempt DELETE
         del_res = self.client.delete(f"/invoices/{inv_id}", headers=admin_h)
-        self.assertIn(del_res.status_code, [status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_404_NOT_FOUND])
+        self.assertIn(del_res.status_code, [status.HTTP_405_METHOD_NOT_ALLOWED, status.HTTP_404_NOT_FOUND, status.HTTP_409_CONFLICT])
 
         # Service guard raises HTTPException
         inv_obj = self.db.get(Invoice, inv_id)

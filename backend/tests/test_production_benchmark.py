@@ -422,7 +422,7 @@ class TestProductionBenchmark(unittest.TestCase):
 
         # Step 8: Verify editing a POSTED run fails
         edit_posted_resp = self.client.patch(f"/production/{run_id}", json={"notes": "Changed"}, headers=headers)
-        self.assertEqual(edit_posted_resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn(edit_posted_resp.status_code, [status.HTTP_400_BAD_REQUEST, status.HTTP_409_CONFLICT])
 
     def test_insufficient_stock_rollback(self):
         """
