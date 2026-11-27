@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/order_to_audit"
 
     # JWT Authentication
-    SECRET_KEY: str = "temporary-secret-key-change-in-production-min-32-chars"
+    # Stable SECRET_KEY across restarts; never randomly generated per process start.
+    SECRET_KEY: str = "order-to-audit-stable-dev-secret-key-min-32-chars-long"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
