@@ -24,6 +24,7 @@ from app.models.customer import Customer, CustomerType
 from app.models.item import Item, ItemType
 from app.models.pricing import PriceList, PriceListItem
 from app.models.product import Product, ProductFamily, PackagingSpec
+from app.models.supplier import Supplier
 from app.models.user import User, UserRole
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -465,6 +466,190 @@ def seed_customers(db: Session, users: dict[str, User]) -> list[Customer]:
     return customers
 
 
+def seed_supplier(db: Session) -> Supplier:
+    supplier = db.scalar(select(Supplier).where(Supplier.gstin == "33AAAAA1111A1Z1"))
+    if not supplier:
+        supplier = Supplier(
+            name="Sri Lakshmi Agro Mills",
+            gstin="33AAAAA1111A1Z1",
+            state_code="33",
+            address="Madurai, Tamil Nadu",
+            phone="9876543210",
+            is_active=True,
+        )
+        db.add(supplier)
+        db.flush()
+    return supplier
+
+
+def seed_benchmark_transactions(
+    db: Session,
+    users: dict[str, User],
+    items: dict[str, Item],
+    product: Product,
+    customers: list[Customer],
+    supplier: Supplier,
+) -> None:
+    """Create the Section 5 business transactions once so a fresh install has its benchmark state."""
+    from app.models.costing import OverheadCategory, OverheadEntry, OverheadStatus
+    from app.models.invoice import Dispatch, DispatchStatus, Invoice
+    from app.models.order import Order, OrderStatus
+    from app.models.payment import Payment, PaymentMode
+    from app.models.production import ProductionRun, ProductionRunStatus
+    from app.models.purchase import Purchase
+    from app.schemas.invoice import DispatchCreate
+    from app.schemas.order import OrderCreate, OrderLineCreate
+    from app.schemas.payment import PaymentAllocationCreate, PaymentCreate
+    from app.schemas.production import ProductionRunCreate, ProductionRunLineUpdate, ProductionRunUpdate
+    from app.schemas.purchase import PurchaseCreate, PurchaseLineCreate
+    from app.services import invoicing as invoicing_service
+    from app.services import orders as orders_service
+    from app.services import production as production_service
+    from app.services import purchase as purchase_service
+    from app.services import receivables as receivables_service
+
+    admin = users["admin@foodmfr.local"]
+    production_user = users["production@foodmfr.local"]
+    salesman_a = users["salesman.a@foodmfr.local"]
+    salesman_b = users["salesman.b@foodmfr.local"]
+    retailer_a, distributor_b = customers
+    now = datetime.now(timezone.utc)
+
+    purchase = db.scalar(
+        select(Purchase).where(Purchase.supplier_invoice_no == "BENCHMARK-PO-001")
+    )
+    if not purchase:
+        purchase_service.create_and_post_purchase(
+            db,
+            PurchaseCreate(
+                supplier_id=supplier.id,
+                supplier_invoice_no="BENCHMARK-PO-001",
+                notes="Section 5 benchmark flour purchase",
+                lines=[
+                    PurchaseLineCreate(
+                        item_id=items["Flour"].id,
+                        quantity_entered=Decimal("60"),
+                        unit_entered="kg",
+                        rate_paise=4500,
+                    )
+                ],
+            ),
+            admin,
+        )
+
+    run = db.scalar(
+        select(ProductionRun).where(ProductionRun.notes == "Section 5 benchmark production run")
+    )
+    if not run:
+        run = production_service.create_run(
+            db,
+            ProductionRunCreate(
+                product_id=product.id,
+                batches=Decimal("1.0000"),
+                run_date=now,
+                notes="Section 5 benchmark production run",
+            ),
+            production_user,
+        )
+    if run.status == ProductionRunStatus.DRAFT:
+        production_service.update_run(
+            db,
+            run.id,
+            ProductionRunUpdate(
+                actual_good_packets=188,
+                lines=[
+                    ProductionRunLineUpdate(item_id=items["Flour"].id, actual_qty_base=40000),
+                    ProductionRunLineUpdate(item_id=items["Cooking oil"].id, actual_qty_base=10500),
+                    ProductionRunLineUpdate(item_id=items["Salt and spice mix"].id, actual_qty_base=1200),
+                    ProductionRunLineUpdate(item_id=items["200 g pouch"].id, damaged_qty_base=6),
+                    ProductionRunLineUpdate(item_id=items["Carton"].id, actual_qty_base=9),
+                ],
+            ),
+            production_user,
+        )
+        production_service.post_run(db, run.id, production_user)
+
+    for category, amount, description in (
+        (OverheadCategory.LABOUR, 120000, "Section 5 benchmark labour"),
+        (OverheadCategory.GAS, 60000, "Section 5 benchmark gas"),
+    ):
+        existing = db.scalar(
+            select(OverheadEntry).where(
+                OverheadEntry.production_run_id == run.id,
+                OverheadEntry.category == category,
+                OverheadEntry.status == OverheadStatus.ACTIVE,
+            )
+        )
+        if not existing:
+            db.add(
+                OverheadEntry(
+                    entry_date=now,
+                    category=category,
+                    amount_paise=amount,
+                    production_run_id=run.id,
+                    description=description,
+                    status=OverheadStatus.ACTIVE,
+                    created_by=production_user.id,
+                )
+            )
+    db.commit()
+
+    retailer_order = db.scalar(
+        select(Order).where(Order.client_uuid == "benchmark-retailer-a-invoice")
+    )
+    if not retailer_order:
+        retailer_order, _ = orders_service.create_order(
+            db,
+            OrderCreate(
+                client_uuid="benchmark-retailer-a-invoice",
+                customer_id=retailer_a.id,
+                lines=[OrderLineCreate(product_id=product.id, quantity_packets=150)],
+            ),
+            salesman_a,
+        )
+    if retailer_order.status == OrderStatus.SUBMITTED:
+        orders_service.approve_order(db, retailer_order.id, admin)
+
+    invoice = db.scalar(select(Invoice).where(Invoice.order_id == retailer_order.id))
+    if not invoice:
+        invoice = invoicing_service.create_invoice_from_order(db, retailer_order.id, admin)
+    if not db.scalar(
+        select(Dispatch).where(
+            Dispatch.invoice_id == invoice.id,
+            Dispatch.status == DispatchStatus.DISPATCHED,
+        )
+    ):
+        invoicing_service.dispatch_invoice(db, invoice.id, DispatchCreate(), admin)
+
+    if not db.scalar(
+        select(Payment).where(Payment.reference_no == "BENCHMARK-RETAILER-A-PAYMENT")
+    ):
+        receivables_service.post_payment(
+            db,
+            PaymentCreate(
+                customer_id=retailer_a.id,
+                amount_paise=400000,
+                mode=PaymentMode.UPI,
+                reference_no="BENCHMARK-RETAILER-A-PAYMENT",
+                allocations=[PaymentAllocationCreate(invoice_id=invoice.id, amount_paise=400000)],
+            ),
+            admin,
+        )
+
+    if not db.scalar(
+        select(Order).where(Order.client_uuid == "benchmark-distributor-b-order")
+    ):
+        orders_service.create_order(
+            db,
+            OrderCreate(
+                client_uuid="benchmark-distributor-b-order",
+                customer_id=distributor_b.id,
+                lines=[OrderLineCreate(product_id=product.id, quantity_packets=120)],
+            ),
+            salesman_b,
+        )
+
+
 def seed_opening_stock_movements(db: Session, items: dict[str, Item], admin_user: User) -> None:
     """
     Posts immutable OPENING movements to stock_movements from seed constants:
@@ -528,9 +713,11 @@ def run_seed(db: Session | None = None) -> None:
         family = seed_product_family(db)
         product = seed_product_and_pricing(db, family, items)
         seed_bom(db, family, product, items)
-        seed_customers(db, users)
+        customers = seed_customers(db, users)
+        supplier = seed_supplier(db)
         seed_opening_stock_movements(db, items, users["admin@foodmfr.local"])
         db.commit()
+        seed_benchmark_transactions(db, users, items, product, customers, supplier)
         logger.info("Master data seeding completed successfully!")
         print_credentials_table()
     except Exception as exc:
