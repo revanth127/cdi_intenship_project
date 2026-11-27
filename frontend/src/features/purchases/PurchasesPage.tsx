@@ -35,6 +35,7 @@ interface PurchaseLineForm {
   item_id: number;
   quantity_entered: string;
   rate_rupees: string;
+  unit_entered: string;
 }
 
 interface PurchaseLine {
@@ -70,6 +71,7 @@ const emptyLine = (): PurchaseLineForm => ({
   item_id: 0,
   quantity_entered: '',
   rate_rupees: '',
+  unit_entered: '',
 });
 
 export const PurchasesPage: React.FC = () => {
@@ -132,8 +134,13 @@ export const PurchasesPage: React.FC = () => {
   const getItem = (itemId: number) => items.find((i) => i.id === itemId);
 
   const handleItemChange = (index: number, itemId: number) => {
+    const item = items.find((it) => it.id === itemId);
     setLines((prev) =>
-      prev.map((line, i) => (i === index ? { ...line, item_id: itemId } : line))
+      prev.map((line, i) =>
+        i === index
+          ? { ...line, item_id: itemId, unit_entered: line.unit_entered || item?.display_unit || item?.base_unit || '' }
+          : line
+      )
     );
   };
 
@@ -200,7 +207,7 @@ export const PurchasesPage: React.FC = () => {
           return {
             item_id: l.item_id,
             quantity_entered: parseFloat(l.quantity_entered),
-            unit_entered: item?.display_unit || item?.base_unit || 'kg',
+            unit_entered: l.unit_entered || item?.display_unit || item?.base_unit || 'kg',
             rate_paise: Math.round((parseFloat(l.rate_rupees) || 0) * 100),
           };
         }),
@@ -423,8 +430,15 @@ export const PurchasesPage: React.FC = () => {
                             className="w-full text-xs h-8 px-2 bg-surface border border-border rounded-[4px] text-right tabular-nums"
                           />
                         </td>
-                        <td className="py-2 px-3 text-text-secondary">
-                          {item ? item.display_unit : '—'}
+                        <td className="py-2 px-3">
+                          <input
+                            aria-label={`Unit for line ${idx + 1}`}
+                            type="text"
+                            value={line.unit_entered || (item ? item.display_unit : '')}
+                            onChange={(e) => handleLineChange(idx, 'unit_entered', e.target.value)}
+                            placeholder={item ? item.display_unit : 'unit'}
+                            className="w-full text-xs h-8 px-2 bg-surface border border-border rounded-[4px]"
+                          />
                         </td>
                         <td className="py-2 px-3">
                           <input

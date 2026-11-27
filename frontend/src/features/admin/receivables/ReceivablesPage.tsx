@@ -36,6 +36,28 @@ interface CustomerOutstanding {
   invoices: InvoiceOutstanding[];
 }
 
+interface StatementTransaction {
+  date: string;
+  type: string;
+  reference_no: string;
+  description: string;
+  debit_paise: number;
+  credit_paise: number;
+  running_balance_paise: number;
+}
+
+interface CustomerStatement {
+  customer_id: number;
+  customer_name: string;
+  from_date: string;
+  to_date: string;
+  opening_balance_paise: number;
+  total_debits_paise: number;
+  total_credits_paise: number;
+  closing_balance_paise: number;
+  transactions: StatementTransaction[];
+}
+
 interface ReceivablesAgeing {
   as_of: string;
   total_bucket_0_30_paise: number;
@@ -66,6 +88,12 @@ export const ReceivablesPage: React.FC<{ isReadOnly?: boolean }> = ({ isReadOnly
   const [ageing, setAgeing] = useState<ReceivablesAgeing | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Statement view state
+  const [statementCustomerId, setStatementCustomerId] = useState<number | null>(null);
+  const [statement, setStatement] = useState<CustomerStatement | null>(null);
+  const [isLoadingStatement, setIsLoadingStatement] = useState(false);
+  const [statementError, setStatementError] = useState<string | null>(null);
 
   // Payment form state
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -98,6 +126,21 @@ export const ReceivablesPage: React.FC<{ isReadOnly?: boolean }> = ({ isReadOnly
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const loadStatement = async (customerId: number) => {
+    setStatementCustomerId(customerId);
+    setIsLoadingStatement(true);
+    setStatementError(null);
+    try {
+      const data = await apiClient.get<CustomerStatement>(`/customers/${customerId}/statement`);
+      setStatement(data);
+    } catch (err: any) {
+      setStatementError(err?.message || 'Failed to load statement.');
+      setStatement(null);
+    } finally {
+      setIsLoadingStatement(false);
+    }
+  };
 
   const openInvoicesForCustomer =
     customers.find((c) => c.customer_id === payCustomerId)?.invoices.filter(
@@ -378,9 +421,80 @@ export const ReceivablesPage: React.FC<{ isReadOnly?: boolean }> = ({ isReadOnly
                   </table>
                 </div>
               )}
+              <div className="px-4 py-2 border-t border-border flex justify-end">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={() => loadStatement(c.customer_id)}
+                  data-testid={`statement-${c.customer_id}`}
+                >
+                  {statementCustomerId === c.customer_id ? 'Refresh statement' : 'View statement'}
+                </Button>
+              </div>
             </section>
           ))}
         </div>
+      )}
+
+      {/* Statement view */}
+      {statementCustomerId !== null && (
+        <section className="border border-border rounded-[6px] bg-surface" data-testid="customer-statement">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <h2 className="text-sm font-semibold text-text-primary">
+              Statement · {statement?.customer_name || '…'}
+            </h2>
+            <Button variant="secondary" size="sm" className="text-xs h-7" onClick={() => { setStatementCustomerId(null); setStatement(null); }}>
+              Close
+            </Button>
+          </div>
+          {isLoadingStatement ? (
+            <div className="p-4 space-y-2"><Skeleton className="h-6 w-full" /><Skeleton className="h-6 w-full" /></div>
+          ) : statementError ? (
+            <div className="p-4"><InlineError message={statementError} /></div>
+          ) : statement ? (
+            <>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-4 py-3 border-b border-border text-xs">
+                <div><span className="text-text-muted block">Opening</span><span className="font-semibold tabular-nums">{paise(statement.opening_balance_paise)}</span></div>
+                <div><span className="text-text-muted block">Total debits</span><span className="font-semibold tabular-nums">{paise(statement.total_debits_paise)}</span></div>
+                <div><span className="text-text-muted block">Total credits</span><span className="font-semibold tabular-nums">{paise(statement.total_credits_paise)}</span></div>
+                <div><span className="text-text-muted block">Closing balance</span><span className="font-semibold tabular-nums">{paise(statement.closing_balance_paise)}</span></div>
+              </div>
+              {statement.transactions.length === 0 ? (
+                <p className="px-4 py-3 text-xs text-text-muted">No transactions in this period.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-text-secondary text-left font-semibold">
+                        <th className="py-2 px-4">Date</th>
+                        <th className="py-2 px-3">Type</th>
+                        <th className="py-2 px-3">Reference</th>
+                        <th className="py-2 px-3">Description</th>
+                        <th className="py-2 px-3 text-right">Debit</th>
+                        <th className="py-2 px-3 text-right">Credit</th>
+                        <th className="py-2 px-3 text-right">Running balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {statement.transactions.map((t, i) => (
+                        <tr key={i}>
+                          <td className="py-2 px-4 text-text-secondary">{formatIndianDate(t.date)}</td>
+                          <td className="py-2 px-3">{t.type}</td>
+                          <td className="py-2 px-3 font-semibold">{t.reference_no}</td>
+                          <td className="py-2 px-3 text-text-secondary">{t.description}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{t.debit_paise ? paise(t.debit_paise) : '—'}</td>
+                          <td className="py-2 px-3 text-right tabular-nums">{t.credit_paise ? paise(t.credit_paise) : '—'}</td>
+                          <td className="py-2 px-3 text-right tabular-nums font-semibold">{paise(t.running_balance_paise)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          ) : null}
+        </section>
       )}
     </div>
   );
