@@ -5,6 +5,11 @@ import {
   formatQuantityWithUnit,
   formatPercentage,
   groupIndianDigits,
+  formatIndianDecimal,
+  convertBaseQuantity,
+  convertToBaseQuantity,
+  formatBaseQuantity,
+  formatUnitCost,
 } from '../index';
 
 describe('Indian Digit Grouping', () => {
@@ -86,5 +91,48 @@ describe('formatPercentage', () => {
     expect(formatPercentage(5.0, false)).toBe('5.0%');
     expect(formatPercentage(-6.0, true)).toBe('-6.0%');
     expect(formatPercentage(0)).toBe('0.0%');
+  });
+
+  it('supports a custom number of decimals without dropping integer zeroes', () => {
+    expect(formatPercentage(-3.0, true, 2)).toBe('-3.00%');
+    expect(formatPercentage(37.7, false, 2)).toBe('37.70%');
+  });
+});
+
+describe('formatIndianDecimal', () => {
+  it('groups Indian digits and trims trailing decimal zeroes', () => {
+    expect(formatIndianDecimal(120000, 3)).toBe('1,20,000');
+    expect(formatIndianDecimal(19.5, 3)).toBe('19.5');
+    expect(formatIndianDecimal(3.8, 3)).toBe('3.8');
+  });
+
+  it('never strips meaningful integer zeroes when no decimals are shown', () => {
+    expect(formatIndianDecimal(120, 0)).toBe('120');
+    expect(formatIndianDecimal(1000, 0)).toBe('1,000');
+  });
+});
+
+describe('base/display quantity conversion', () => {
+  it('converts mass and volume base quantities into display units', () => {
+    expect(convertBaseQuantity(40000, 'g', 'kg')).toBe(40);
+    expect(convertBaseQuantity(19500, 'ml', 'L')).toBe(19.5);
+    expect(convertBaseQuantity(194, 'piece', 'piece')).toBe(194);
+  });
+
+  it('round-trips display quantities back to integer base units', () => {
+    expect(convertToBaseQuantity(40, 'g', 'kg')).toBe(40000);
+    expect(convertToBaseQuantity(19.5, 'ml', 'L')).toBe(19500);
+    expect(convertToBaseQuantity(9, 'piece', 'piece')).toBe(9);
+  });
+
+  it('formats base quantities in their display unit', () => {
+    expect(formatBaseQuantity(40000, 'g', 'kg')).toBe('40');
+    expect(formatBaseQuantity(19500, 'ml', 'L')).toBe('19.5');
+  });
+
+  it('converts paise per base unit into rupees per display unit', () => {
+    expect(formatUnitCost(4.3125, 'g', 'kg')).toBe('₹43.13');
+    expect(formatUnitCost(14, 'ml', 'L')).toBe('₹140.00');
+    expect(formatUnitCost(250, 'piece', 'piece')).toBe('₹2.50');
   });
 });
