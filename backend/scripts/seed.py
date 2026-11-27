@@ -23,7 +23,7 @@ from app.models.company import CompanySettings
 from app.models.customer import Customer, CustomerType
 from app.models.item import Item, ItemType
 from app.models.pricing import PriceList, PriceListItem
-from app.models.product import Product
+from app.models.product import Product, ProductFamily, PackagingSpec
 from app.models.user import User, UserRole
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -220,22 +220,83 @@ def seed_items(db: Session) -> dict[str, Item]:
     return item_map
 
 
-def seed_product_and_pricing(db: Session, items: dict[str, Item]) -> Product:
-    """Seed Product pack for Murukku 200 g and Default PriceList with Rs 50/packet."""
+def seed_product_family(db: Session) -> ProductFamily:
+    """Seed ProductFamily 'Murukku' sharing common BOM across variants."""
+    family = db.scalar(select(ProductFamily).where(ProductFamily.name == "Murukku"))
+    if not family:
+        family = ProductFamily(
+            name="Murukku",
+            hsn_code="1905",
+            gst_rate_bp=500,
+            is_active=True,
+        )
+        db.add(family)
+        db.flush()
+        logger.info("Created ProductFamily: Murukku (HSN 1905, 5% GST)")
+    return family
+
+
+def seed_product_and_pricing(db: Session, family: ProductFamily, items: dict[str, Item]) -> Product:
+    """
+    Seed Product pack variant for Murukku 200 g, its PackagingSpecs,
+    and Default PriceList with Rs 50/packet.
+    """
     finished_item = items["Murukku 200 g"]
     product = db.scalar(select(Product).where(Product.item_id == finished_item.id))
     if not product:
         product = Product(
+            family_id=family.id,
             item_id=finished_item.id,
-            pack_size_desc="200 g",
+            pack_name="Murukku 200 g",
+            net_weight_g=200,
             packets_per_carton=20,  # 1 carton holds 20 packets
+            is_active=True,
         )
         db.add(product)
         db.flush()
-        logger.info("Created Product: Murukku 200 g (20 packets/carton).")
+        logger.info("Created Product variant: Murukku 200 g (20 packets/carton).")
     else:
-        product.pack_size_desc = "200 g"
+        product.family_id = family.id
+        product.pack_name = "Murukku 200 g"
+        product.net_weight_g = 200
         product.packets_per_carton = 20
+
+    # Seed PackagingSpec for Murukku 200 g:
+    # Pouch: 1 per 1 packet
+    # Carton: 1 per 20 packets
+    pouch_spec = db.scalar(
+        select(PackagingSpec).where(
+            PackagingSpec.product_id == product.id,
+            PackagingSpec.item_id == items["200 g pouch"].id,
+        )
+    )
+    if not pouch_spec:
+        pouch_spec = PackagingSpec(
+            product_id=product.id,
+            item_id=items["200 g pouch"].id,
+            qty_base=1,
+            per_packets=1,
+            unit_for_display="piece",
+        )
+        db.add(pouch_spec)
+        logger.info("Created PackagingSpec for Murukku 200 g: 200 g pouch (1 per 1 packet)")
+
+    carton_spec = db.scalar(
+        select(PackagingSpec).where(
+            PackagingSpec.product_id == product.id,
+            PackagingSpec.item_id == items["Carton"].id,
+        )
+    )
+    if not carton_spec:
+        carton_spec = PackagingSpec(
+            product_id=product.id,
+            item_id=items["Carton"].id,
+            qty_base=1,
+            per_packets=20,
+            unit_for_display="piece",
+        )
+        db.add(carton_spec)
+        logger.info("Created PackagingSpec for Murukku 200 g: Carton (1 per 20 packets)")
 
     # Seed Default PriceList
     price_list = db.scalar(select(PriceList).where(PriceList.name == "Standard Selling Price"))
@@ -271,38 +332,38 @@ def seed_product_and_pricing(db: Session, items: dict[str, Item]) -> Product:
     return product
 
 
-def seed_bom(db: Session, product: Product, items: dict[str, Item]) -> BOM:
+def seed_bom(db: Session, family: ProductFamily, product: Product, items: dict[str, Item]) -> BOM:
     """
-    Seed BOM for Murukku 200 g:
-    1 batch = 200 packets:
+    Seed Family BOM for Murukku:
+    Batch yield = 40,000 g finished output.
+    Recipe ingredients (RAW_MATERIAL only):
       - Flour: 40 kg = 40,000 g
       - Cooking oil: 10 L = 10,000 ml
       - Salt and spice mix: 1.2 kg = 1,200 g
-      - 200 g pouch: 200 pieces
-      - Carton: 10 pieces (for packing 200 packets @ 20 pkts/carton)
     """
-    bom = db.scalar(select(BOM).where(BOM.product_id == product.id, BOM.version == 1))
+    bom = db.scalar(select(BOM).where(BOM.family_id == family.id, BOM.version == 1))
     if not bom:
         bom = BOM(
+            family_id=family.id,
             product_id=product.id,
             version=1,
-            batch_output_packets=200,
+            expected_output_g=40000,
             is_active=True,
         )
         db.add(bom)
         db.flush()
-        logger.info("Created BOM: Version 1 for Murukku 200 g (200 packets yield).")
+        logger.info("Created Family BOM: Version 1 for Murukku (40,000 g expected output).")
+    else:
+        bom.product_id = product.id
 
-    # Required recipe items in BASE UNITS
-    required_bom_items = [
-        {"item": items["Flour"], "qty_base": 40000, "unit_display": "kg"},          # 40 kg
-        {"item": items["Cooking oil"], "qty_base": 10000, "unit_display": "L"},       # 10 L
-        {"item": items["Salt and spice mix"], "qty_base": 1200, "unit_display": "kg"},# 1.2 kg
-        {"item": items["200 g pouch"], "qty_base": 200, "unit_display": "piece"},     # 200 pouches
-        {"item": items["Carton"], "qty_base": 10, "unit_display": "piece"},           # 10 shipper cartons
+    # Required recipe ingredients in BASE UNITS (RAW_MATERIAL only)
+    required_ingredients = [
+        {"item": items["Flour"], "qty_base": 40000, "unit_display": "kg"},           # 40 kg
+        {"item": items["Cooking oil"], "qty_base": 10000, "unit_display": "L"},        # 10 L
+        {"item": items["Salt and spice mix"], "qty_base": 1200, "unit_display": "kg"}, # 1.2 kg
     ]
 
-    for req in required_bom_items:
+    for req in required_ingredients:
         bom_item = db.scalar(
             select(BOMItem).where(
                 BOMItem.bom_id == bom.id,
@@ -434,8 +495,9 @@ def run_seed(db: Session | None = None) -> None:
         seed_company_settings(db)
         users = seed_users(db)
         items = seed_items(db)
-        product = seed_product_and_pricing(db, items)
-        seed_bom(db, product, items)
+        family = seed_product_family(db)
+        product = seed_product_and_pricing(db, family, items)
+        seed_bom(db, family, product, items)
         seed_customers(db, users)
         seed_opening_stock_movements(db, items, users["admin@foodmfr.local"])
         db.commit()

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 import logging
+import math
 from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy import desc, select
@@ -173,7 +174,11 @@ def create_run(db: Session, payload: ProductionRunCreate, user: User) -> Product
       - `batches` (e.g. Decimal("1.0000"))
       - `batch_size_packets` / `batch_size` (e.g. 200 packets)
     """
-    product = db.scalar(select(Product).where(Product.id == payload.product_id))
+    product = db.scalar(
+        select(Product)
+        .options(selectinload(Product.packaging_specs))
+        .where(Product.id == payload.product_id)
+    )
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Product {payload.product_id} not found")
 
@@ -181,7 +186,7 @@ def create_run(db: Session, payload: ProductionRunCreate, user: User) -> Product
         bom = db.scalar(
             select(BOM)
             .options(selectinload(BOM.items))
-            .where(BOM.id == payload.bom_id, BOM.product_id == product.id)
+            .where(BOM.id == payload.bom_id)
         )
         if not bom:
             raise HTTPException(
@@ -192,33 +197,46 @@ def create_run(db: Session, payload: ProductionRunCreate, user: User) -> Product
         bom = db.scalar(
             select(BOM)
             .options(selectinload(BOM.items))
-            .where(BOM.product_id == product.id, BOM.is_active.is_(True))
+            .where(BOM.family_id == product.family_id, BOM.is_active.is_(True))
+            .order_by(desc(BOM.version))
+            .limit(1)
         )
+        if not bom:
+            # Fallback check if bom is associated directly or via family
+            bom = db.scalar(
+                select(BOM)
+                .options(selectinload(BOM.items))
+                .where(BOM.is_active.is_(True))
+                .order_by(desc(BOM.version))
+                .limit(1)
+            )
         if not bom:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"No active BOM found for Product {payload.product_id}",
             )
 
-    # Determine batches and expected output
+    net_weight = product.net_weight_g if product.net_weight_g else 200
+    expected_output_g = bom.expected_output_g if hasattr(bom, "expected_output_g") and bom.expected_output_g else 40000
+
+    # Determine batches and expected output:
+    # expected_packets = floor(batches * expected_output_g / net_weight_g)
     target_packets = payload.batch_size_packets or payload.batch_size
     if target_packets is not None:
         if target_packets <= 0:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Batch size packets must be positive")
         expected_output = target_packets
-        batches = (Decimal(target_packets) / Decimal(bom.batch_output_packets)).quantize(
+        batches = ((Decimal(target_packets) * Decimal(net_weight)) / Decimal(expected_output_g)).quantize(
             Decimal("0.0001"), rounding=ROUND_HALF_UP
         )
     elif payload.batches is not None:
         batches = Decimal(payload.batches).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
         if batches <= 0:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Batches must be positive")
-        expected_output = int(
-            (Decimal(bom.batch_output_packets) * batches).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-        )
+        expected_output = math.floor(float(batches * Decimal(expected_output_g) / Decimal(net_weight)))
     else:
         batches = Decimal("1.0000")
-        expected_output = bom.batch_output_packets
+        expected_output = math.floor(float(Decimal(expected_output_g) / Decimal(net_weight)))
 
     run_no = generate_run_number(db, payload.run_date)
     run_date = payload.run_date or datetime.now(timezone.utc)
@@ -237,8 +255,8 @@ def create_run(db: Session, payload: ProductionRunCreate, user: User) -> Product
         notes=payload.notes,
     )
 
-    # Scale BOM items into integer base units with ROUND_HALF_UP
-    # Formula: planned_qty_base = round(quantity_per_batch * batches, ROUND_HALF_UP)
+    # 1. Ingredients from BOM (RAW_MATERIAL)
+    # Ingredient planned quantity = quantity_per_batch x batches, ROUND_HALF_UP
     for bi in bom.items:
         planned_qty = int(
             (Decimal(bi.quantity_per_batch) * batches).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
@@ -249,6 +267,19 @@ def create_run(db: Session, payload: ProductionRunCreate, user: User) -> Product
             actual_qty_base=None,
             damaged_qty_base=0,
             unit_for_display=bi.unit_for_display,
+        )
+        run.lines.append(line)
+
+    # 2. Packaging from Product.packaging_specs (PACKAGING)
+    # Planned packaging = CEIL(expected_packets x qty_base / per_packets), because you cannot use part of a carton.
+    for ps in product.packaging_specs:
+        planned_qty = math.ceil((expected_output * ps.qty_base) / ps.per_packets)
+        line = ProductionRunLine(
+            item_id=ps.item_id,
+            planned_qty_base=planned_qty,
+            actual_qty_base=None,
+            damaged_qty_base=0,
+            unit_for_display=ps.unit_for_display,
         )
         run.lines.append(line)
 
@@ -300,8 +331,19 @@ def update_run(db: Session, run_id: int, payload: ProductionRunUpdate, user: Use
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Production run {run_id} not found")
 
     if run.status != ProductionRunStatus.DRAFT:
+        attempted_dict = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else dict(payload)
+        log_audit(
+            db=db,
+            user=user,
+            action="edit_rejected",
+            entity_type="production_run",
+            entity_id=str(run.id),
+            old_values={"status": run.status.value, "run_no": run.run_no},
+            new_values=attempted_dict,
+        )
+        db.commit()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=f"Cannot edit production run {run.run_no} with status {run.status.value}. Only DRAFT runs can be edited.",
         )
 

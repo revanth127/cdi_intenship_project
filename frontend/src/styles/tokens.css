@@ -1,0 +1,44 @@
+:root {
+  /* Surfaces */
+  --bg-page: #f8fafc;        /* slate-50: clean light-gray page background */
+  --bg-surface: #ffffff;     /* white: cards, tables, panels */
+  --bg-surface-subtle: #f1f5f9; /* slate-100: header row, zebra, disabled */
+  --bg-surface-hover: #f8fafc;  /* subtle row hover */
+
+  /* Borders & Dividers */
+  --border-subtle: #e2e8f0;  /* slate-200: 1px borders */
+  --border-strong: #cbd5e1;  /* slate-300: input focus/active borders */
+
+  /* Text & Foreground */
+  --text-primary: #0f172a;   /* slate-900: primary figures, titles */
+  --text-secondary: #475569; /* slate-600: descriptions, context */
+  --text-muted: #64748b;     /* slate-500: table headers, captions */
+  --text-disabled: #94a3b8;  /* slate-400: disabled */
+
+  /* Accent: Single restrained deep blue */
+  --accent-primary: #1e40af; /* blue-800: restrained deep blue */
+  --accent-hover: #1e3a8a;   /* blue-900 */
+  --accent-light: #eff6ff;   /* blue-50: active row/chip background */
+
+  /* Status Tokens: Green (OK), Amber (Warning), Red (Breach) - strictly with text labels */
+  --status-ok-bg: #f0fdf4;       /* green-50 */
+  --status-ok-text: #166534;     /* green-800 */
+  --status-ok-border: #bbf7d0;   /* green-200 */
+
+  --status-warning-bg: #fffbeb;  /* amber-50 */
+  --status-warning-text: #92400e;/* amber-800 */
+  --status-warning-border: #fde68a; /* amber-200 */
+
+  --status-breach-bg: #fef2f2;   /* red-50 */
+  --status-breach-text: #991b1b;  /* red-800 */
+  --status-breach-border: #fecaca;/* red-200 */
+
+  /* Radius: strict 6px radius */
+  --radius: 6px;
+
+  /* Shadows: at most one subtle shadow level (popovers only) */
+  --shadow-popover: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+
+  /* Typography */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}

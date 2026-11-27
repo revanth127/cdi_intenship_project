@@ -53,4 +53,37 @@ RESOURCE_PERMISSIONS = {
         "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT, UserRole.PRODUCTION, UserRole.SALESMAN],
         "adjust": [UserRole.ADMIN],
     },
+    "invoices": {
+        "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT, UserRole.SALESMAN],
+        "write": [UserRole.ADMIN],
+    },
+    "dispatches": {
+        "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT],
+        "write": [UserRole.ADMIN],
+    },
+    "credit_notes": {
+        "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT],
+        "write": [UserRole.ADMIN],
+    },
+    "payments": {
+        "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT],
+        "write": [UserRole.ADMIN],
+    },
+    "receivables": {
+        "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT, UserRole.SALESMAN],
+        "write": [UserRole.ADMIN],
+    },
+    "overheads": {
+        "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT, UserRole.PRODUCTION],
+        "write": [UserRole.ADMIN, UserRole.PRODUCTION],
+        "void": [UserRole.ADMIN],
+    },
+    "costing": {
+        "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT],
+        "write": [UserRole.ADMIN],
+    },
+    "dashboard": {
+        "read": [UserRole.ADMIN, UserRole.OWNER, UserRole.ACCOUNTANT],
+        "write": [UserRole.ADMIN],
+    },
 }

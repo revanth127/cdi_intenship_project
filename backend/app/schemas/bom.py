@@ -12,9 +12,32 @@ class BOMItemBase(BaseModel):
         None, ge=0, le=100, description="Optional override variance tolerance percentage for this item"
     )
 
+    @property
+    def quantity_per_batch_base(self) -> int:
+        return self.quantity_per_batch
 
-class BOMItemCreate(BOMItemBase):
-    pass
+    @property
+    def tolerance_override(self) -> Optional[Decimal]:
+        return self.variance_tolerance_pct
+
+
+class BOMItemCreate(BaseModel):
+    item_id: int
+    quantity_per_batch: Optional[int] = Field(None, gt=0)
+    quantity_per_batch_base: Optional[int] = Field(None, gt=0)
+    unit_for_display: str = Field("kg", max_length=16)
+    variance_tolerance_pct: Optional[Decimal] = Field(None, ge=0, le=100)
+    tolerance_override: Optional[Decimal] = Field(None, ge=0, le=100)
+
+    def model_post_init(self, __context):
+        if self.quantity_per_batch is None and self.quantity_per_batch_base is not None:
+            self.quantity_per_batch = self.quantity_per_batch_base
+        elif self.quantity_per_batch is not None and self.quantity_per_batch_base is None:
+            self.quantity_per_batch_base = self.quantity_per_batch
+        if self.variance_tolerance_pct is None and self.tolerance_override is not None:
+            self.variance_tolerance_pct = self.tolerance_override
+        elif self.variance_tolerance_pct is not None and self.tolerance_override is None:
+            self.tolerance_override = self.variance_tolerance_pct
 
 
 class BOMItemResponse(BOMItemBase):
@@ -26,9 +49,11 @@ class BOMItemResponse(BOMItemBase):
 
 
 class BOMBase(BaseModel):
-    product_id: int
+    family_id: Optional[int] = None
+    product_id: Optional[int] = None
     version: int = Field(1, gt=0)
-    batch_output_packets: int = Field(..., gt=0, description="Standard batch yield in packets")
+    expected_output_g: int = Field(40000, gt=0, description="Expected finished output grams per batch")
+    batch_output_packets: Optional[int] = Field(None, description="Calculated packets yield")
     is_active: bool = True
 
 

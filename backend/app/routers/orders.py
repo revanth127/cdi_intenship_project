@@ -156,3 +156,20 @@ def reject_order(
     Rejects an order (Admin only). Requires a reason of at least 3 characters.
     """
     return order_service.reject_order(db=db, order_id=order_id, reason=payload.reason, user=current_user)
+
+
+@router.post("/{order_id}/invoice", response_model=InvoiceResponse, dependencies=[Depends(ALLOW_ADMIN)])
+def invoice_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Creates an immutable GST Tax Invoice from an APPROVED order (Admin only).
+    - Snapshots seller & buyer master details.
+    - Computes GST strictly via utils/gst.py.
+    - Generates gapless sequential invoice number <= 16 chars per financial year.
+    - Transitions order status to INVOICED.
+    """
+    return invoicing_service.create_invoice_from_order(db=db, order_id=order_id, user=current_user)
+

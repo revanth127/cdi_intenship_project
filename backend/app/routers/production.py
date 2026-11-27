@@ -8,6 +8,8 @@ from app.core.db import get_db
 from app.core.deps import get_current_user, require_roles
 from app.models.production import ProductionRun, ProductionRunLine, ProductionRunStatus
 from app.models.user import User, UserRole
+from app.models.audit import AuditLog
+from app.schemas.audit import DocumentHistoryItem
 from app.schemas.production import (
     ProductionRunCancel,
     ProductionRunCreate,
@@ -107,6 +109,7 @@ def get_production_run(run_id: int, db: Session = Depends(get_db)):
     return prod_service.attach_variance_report(db, run)
 
 
+@router.put("/{run_id}", response_model=ProductionRunResponse, dependencies=[Depends(ALLOW_WRITE)])
 @router.patch("/{run_id}", response_model=ProductionRunResponse, dependencies=[Depends(ALLOW_WRITE)])
 def update_production_run(
     run_id: int,
@@ -116,9 +119,49 @@ def update_production_run(
 ):
     """
     Edits actual quantities, damaged items, and finished output for a DRAFT run.
-    Audits every edit.
+    Audits every edit. Returns 409 and logs 'edit_rejected' if the run is POSTED.
     """
     return prod_service.update_run(db=db, run_id=run_id, payload=payload, user=current_user)
+
+
+@router.get("/{run_id}/history", response_model=list[DocumentHistoryItem], dependencies=[Depends(ALLOW_READ)])
+def get_production_run_history(run_id: int, db: Session = Depends(get_db)):
+    """
+    Returns the complete chronological audit timeline for this production run (what changed, by whom, when).
+    Includes run creation, draft updates, posting, cancellation, and any rejected edit attempts.
+    """
+    run = db.get(ProductionRun, run_id)
+    if not run:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Production run not found")
+
+    from sqlalchemy import func
+    stmt = (
+        select(AuditLog)
+        .options(selectinload(AuditLog.user))
+        .where(
+            func.lower(AuditLog.entity_type).in_(["productionrun", "production_run"]),
+            AuditLog.entity_id == str(run_id),
+        )
+        .order_by(AuditLog.created_at.asc(), AuditLog.id.asc())
+    )
+    logs = db.scalars(stmt).all()
+    return [
+        DocumentHistoryItem(
+            id=l.id,
+            action=l.action,
+            entity_type=l.entity_type,
+            entity_id=l.entity_id,
+            user_id=l.user_id,
+            user_name=l.user.full_name if l.user else None,
+            request_id=l.request_id,
+            ip_address=l.ip_address,
+            old_values=l.old_values,
+            new_values=l.new_values,
+            created_at=l.created_at,
+        )
+        for l in logs
+    ]
 
 
 @router.post("/{run_id}/post", response_model=ProductionRunResponse, dependencies=[Depends(ALLOW_WRITE)])

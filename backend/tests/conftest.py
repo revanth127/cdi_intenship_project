@@ -34,6 +34,40 @@ def engine():
         test_engine = create_engine(TEST_DB_URL, pool_pre_ping=True)
 
     Base.metadata.create_all(bind=test_engine)
+
+    # Attach immutable append-only triggers for stock_movements and audit_logs in SQLite tests
+    if test_engine.dialect.name == "sqlite":
+        from sqlalchemy import text
+        with test_engine.begin() as conn:
+            conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_logs_update
+            BEFORE UPDATE ON audit_logs
+            BEGIN
+                SELECT RAISE(ABORT, 'Audit logs are strictly immutable. UPDATE operations are forbidden.');
+            END;
+            """))
+            conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS trg_prevent_audit_logs_delete
+            BEFORE DELETE ON audit_logs
+            BEGIN
+                SELECT RAISE(ABORT, 'Audit logs are strictly immutable. DELETE operations are forbidden.');
+            END;
+            """))
+            conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS trg_prevent_stock_movements_update
+            BEFORE UPDATE ON stock_movements
+            BEGIN
+                SELECT RAISE(ABORT, 'Stock movements are strictly immutable. UPDATE operations are forbidden.');
+            END;
+            """))
+            conn.execute(text("""
+            CREATE TRIGGER IF NOT EXISTS trg_prevent_stock_movements_delete
+            BEFORE DELETE ON stock_movements
+            BEGIN
+                SELECT RAISE(ABORT, 'Stock movements are strictly immutable. DELETE operations are forbidden.');
+            END;
+            """))
+
     yield test_engine
     Base.metadata.drop_all(bind=test_engine)
     test_engine.dispose()

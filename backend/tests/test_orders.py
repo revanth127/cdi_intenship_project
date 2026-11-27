@@ -28,7 +28,7 @@ from app.models.order import (
 )
 from app.models.pricing import CustomerPriceOverride, PriceList, PriceListItem
 from app.models.product import Product
-from app.models.stock import MovementType
+from app.models.stock import MovementType, StockMovement
 from app.models.user import User, UserRole
 from app.services.stock import get_balance, post_movement
 
@@ -332,14 +332,107 @@ class TestOrderFlow(unittest.TestCase):
         self.assertEqual(appr_override.status_code, status.HTTP_200_OK, appr_override.text)
         self.assertEqual(appr_override.json()["status"], "APPROVED")
 
-    @unittest.skip("Phase 6 dispatch verification: to be enabled in Phase 6")
     def test_section_7_phase6_dispatch_benchmark(self):
         """
-        After the dispatch in Phase 6:
-        Retailer A's 150 packets are dispatched, deducting 150 from ledger:
-        on_hand becomes 88, committed becomes 0, available becomes 88.
+        Phase 6 dispatch verification:
+        1. Salesman A places order for Retailer A (150 packets).
+        2. Admin approves Retailer A's order.
+        3. Admin raises GST Tax Invoice (POST /orders/{id}/invoice).
+        4. Admin dispatches goods (POST /invoices/{id}/dispatch).
+        5. Verify ledger row: 150 packets deducted, source_type='INVOICE', on_hand=88.
+        6. Salesman B places order for Distributor B (120 packets):
+           Available-to-Promise check shows on_hand=88, committed=0, available=88, shortage=32.
+        7. Admin approval blocked with 409 Conflict.
         """
-        pass
+        admin_headers = {"Authorization": f"Bearer {self.admin_token}"}
+        headers_a = {"Authorization": f"Bearer {self.sales_a_token}"}
+        headers_b = {"Authorization": f"Bearer {self.sales_b_token}"}
+
+        # 1. Retailer A order: 150 packets
+        resp_a = self.client.post(
+            "/orders",
+            json={
+                "client_uuid": "dispatch-bench-order-001",
+                "customer_id": self.retailer_a.id,
+                "lines": [{"product_id": self.product.id, "quantity_packets": 150}],
+            },
+            headers=headers_a,
+        )
+        self.assertEqual(resp_a.status_code, status.HTTP_201_CREATED)
+        order_a_id = resp_a.json()["id"]
+
+        # 2. Approve Order A
+        appr_a = self.client.post(f"/orders/{order_a_id}/approve", headers=admin_headers)
+        self.assertEqual(appr_a.status_code, status.HTTP_200_OK)
+
+        # 3. Invoice Order A
+        inv_resp = self.client.post(f"/orders/{order_a_id}/invoice", headers=admin_headers)
+        self.assertEqual(inv_resp.status_code, status.HTTP_200_OK, inv_resp.text)
+        invoice_a = inv_resp.json()
+        invoice_a_id = invoice_a["id"]
+        self.assertEqual(invoice_a["status"], "POSTED")
+        self.assertTrue(invoice_a["invoice_no"].startswith("INV-") or invoice_a["invoice_no"].startswith("INV/"))
+
+        # Verify order transitioned to INVOICED
+        order_a_get = self.client.get(f"/orders/{order_a_id}", headers=admin_headers).json()
+        self.assertEqual(order_a_get["status"], "INVOICED")
+
+        # 4. Dispatch goods for Invoice A
+        disp_resp = self.client.post(
+            f"/invoices/{invoice_a_id}/dispatch",
+            json={"vehicle_no": "TN-59-AB-1234"},
+            headers=admin_headers,
+        )
+        self.assertEqual(disp_resp.status_code, status.HTTP_200_OK, disp_resp.text)
+        dispatch_a = disp_resp.json()
+        self.assertEqual(dispatch_a["status"], "DISPATCHED")
+
+        # Verify order transitioned to DISPATCHED
+        order_a_dispatched = self.client.get(f"/orders/{order_a_id}", headers=admin_headers).json()
+        self.assertEqual(order_a_dispatched["status"], "DISPATCHED")
+
+        # 5. Finished goods ledger balance is now 88 packets (238 - 150)
+        bal = get_balance(self.db, self.murukku_item.id)
+        self.assertEqual(bal, 88)
+
+        # Verify ledger row links to invoice
+        mv = self.db.scalars(
+            select(StockMovement).where(
+                StockMovement.source_type == "INVOICE",
+                StockMovement.source_id == str(invoice_a_id),
+            )
+        ).first()
+        self.assertIsNotNone(mv)
+        self.assertEqual(mv.quantity_base, -150)
+        self.assertEqual(mv.movement_type, MovementType.DISPATCH)
+
+        # 6. Salesman B places order for Distributor B: 120 packets
+        resp_b = self.client.post(
+            "/orders",
+            json={
+                "client_uuid": "dispatch-bench-order-002",
+                "customer_id": self.distributor_b.id,
+                "lines": [{"product_id": self.product.id, "quantity_packets": 120}],
+            },
+            headers=headers_b,
+        )
+        self.assertEqual(resp_b.status_code, status.HTTP_201_CREATED)
+        order_b_id = resp_b.json()["id"]
+
+        # 7. Check ATP availability for Order B:
+        # on_hand = 88, committed = 0 (Order A is now DISPATCHED, so committed drops!), available = 88, shortage = 32
+        get_b = self.client.get(f"/orders/{order_b_id}", headers=admin_headers).json()
+        avail_b = get_b["stock_availability"][0]
+        self.assertEqual(avail_b["on_hand"], 88)
+        self.assertEqual(avail_b["committed_elsewhere"], 0)
+        self.assertEqual(avail_b["available"], 88)
+        self.assertEqual(avail_b["requested"], 120)
+        self.assertEqual(avail_b["shortage"], 32)
+        self.assertFalse(avail_b["ok"])
+
+        # Admin approval without shortage override fails with 409 Conflict
+        appr_b_fail = self.client.post(f"/orders/{order_b_id}/approve", headers=admin_headers)
+        self.assertEqual(appr_b_fail.status_code, status.HTTP_409_CONFLICT)
 
     def test_idempotency_client_uuid(self):
         """

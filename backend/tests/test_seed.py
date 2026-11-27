@@ -133,14 +133,22 @@ class TestSeedScript(unittest.TestCase):
         self.assertEqual(bom.batch_output_packets, 200)
 
         bom_items = self.db.scalars(select(BOMItem).where(BOMItem.bom_id == bom.id)).all()
-        self.assertEqual(len(bom_items), 5)
+        self.assertEqual(len(bom_items), 3)
         bom_map = {bi.item_id: bi for bi in bom_items}
 
         self.assertEqual(bom_map[flour.id].quantity_per_batch, 40000)  # 40 kg flour
         self.assertEqual(bom_map[oil.id].quantity_per_batch, 10000)    # 10 L oil
         self.assertEqual(bom_map[spice.id].quantity_per_batch, 1200)   # 1.2 kg spice mix
-        self.assertEqual(bom_map[pouch.id].quantity_per_batch, 200)    # 200 pouches
-        self.assertEqual(bom_map[carton.id].quantity_per_batch, 10)    # 10 cartons (200 pkts / 20 pkts/carton)
+
+        # Verify PackagingSpecs on Product variant (Murukku 200 g)
+        from app.models.product import PackagingSpec
+        pkg_specs = self.db.scalars(select(PackagingSpec).where(PackagingSpec.product_id == product.id)).all()
+        self.assertEqual(len(pkg_specs), 2)
+        pkg_map = {ps.item_id: ps for ps in pkg_specs}
+        self.assertEqual(pkg_map[pouch.id].qty_base, 1)
+        self.assertEqual(pkg_map[pouch.id].per_packets, 1)             # 1 pouch per 1 packet
+        self.assertEqual(pkg_map[carton.id].qty_base, 1)
+        self.assertEqual(pkg_map[carton.id].per_packets, 20)           # 1 carton per 20 packets
 
         # 6. Verify Customers
         customers = self.db.scalars(select(Customer)).all()
@@ -163,7 +171,8 @@ class TestSeedScript(unittest.TestCase):
         self.assertEqual(len(self.db.scalars(select(Item)).all()), 6)
         self.assertEqual(len(self.db.scalars(select(Product)).all()), 1)
         self.assertEqual(len(self.db.scalars(select(BOM)).all()), 1)
-        self.assertEqual(len(self.db.scalars(select(BOMItem)).all()), 5)
+        self.assertEqual(len(self.db.scalars(select(BOMItem)).all()), 3)
+        self.assertEqual(len(self.db.scalars(select(PackagingSpec)).all()), 2)
         self.assertEqual(len(self.db.scalars(select(Customer)).all()), 2)
         self.assertEqual(len(self.db.scalars(select(CompanySettings)).all()), 1)
 

@@ -32,6 +32,13 @@ htmlcov/
 data/
 postgres_data/
 
+# Frontend dependencies & build artifacts
+node_modules/
+dist/
+
+# SQLite databases
+*.db
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -551,10 +551,11 @@ def approve_order(
     )
     order.status_history.append(history)
 
+    action = "ORDER_APPROVED_WITH_SHORTAGE" if shortages else "ORDER_APPROVED"
     log_audit(
         db=db,
         user=user,
-        action="ORDER_APPROVED",
+        action=action,
         entity_type="Order",
         entity_id=order.id,
         old_values={"status": from_status.value},
@@ -563,6 +564,14 @@ def approve_order(
             "approved_by": user.id,
             "approved_at": str(now),
             "approved_with_shortage": bool(shortages),
+            "shortages": [
+                {
+                    "product_id": s.product_id,
+                    "product_name": s.product_name,
+                    "shortage": s.shortage,
+                }
+                for s in shortages
+            ] if shortages else [],
         },
     )
 

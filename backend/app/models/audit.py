@@ -11,6 +11,7 @@ class AuditLog(Base):
     """
     Immutable audit trail recording administrative and financial actions
     across master records, user roles, invoices, orders, and production runs.
+    Append-only: database triggers strictly block UPDATE and DELETE.
     """
     __tablename__ = "audit_logs"
 
@@ -21,6 +22,9 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     entity_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     entity_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    request_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
 
     # JSON with JSONB variant on PostgreSQL for efficient JSON indexing and queries
     old_values: Mapped[Optional[dict[str, Any]]] = mapped_column(
