@@ -135,7 +135,7 @@ The repository does not include the Section 6 rubric text, so the following is a
 ## Business assumptions
 
 - GST rate for the benchmark finished product: **5%**.
-- Item HSN codes are seeded as master data (for example, finished Murukku `2106`); tax treatment follows the item/customer/company state data.
+- Item HSN codes are seeded as master data (for example, finished Murukku `1905`); tax treatment follows the item/customer/company state data.
 - Financial year starts in **April** and ends in **March**.
 - Invoice identifiers use the backend format `INV/YYYY-YY/NNNN` (for example, `INV/2026-27/0001`); order identifiers use `ORD-YYYY-NNNN`.
 - Amounts are represented in paise. GST components are rounded independently to whole paise using `ROUND_HALF_UP`; other calculated money values use decimal half-up rounding.
