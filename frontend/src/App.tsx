@@ -11,6 +11,9 @@ import { SalesmanOrdersList } from '@/features/salesman/SalesmanOrdersList';
 import { PurchasesPage } from '@/features/purchases/PurchasesPage';
 import { StockLedgerPage } from '@/features/stock/StockLedgerPage';
 import { ProductionOperationsPage } from '@/features/production/ProductionOperationsPage';
+import { AdminOrdersPage } from '@/features/admin/orders/AdminOrdersPage';
+import { InvoicesPage } from '@/features/admin/invoices/InvoicesPage';
+import { ReceivablesPage } from '@/features/admin/receivables/ReceivablesPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +32,26 @@ const PlaceholderModule: React.FC<{ title: string; subtitle: string }> = ({ titl
   </div>
 );
 
+// Admin order inbox for admins; read-only inbox for accountants; salesman list otherwise
+const OrdersRoute: React.FC = () => {
+  const { user } = useAuth();
+  if (user?.role === 'ADMIN') return <AdminOrdersPage />;
+  if (user?.role === 'ACCOUNTANT') return <AdminOrdersPage isReadOnly />;
+  return <SalesmanOrdersList />;
+};
+
+// Invoices are read-only for accountants; mutations require admin
+const InvoicesRoute: React.FC = () => {
+  const { user } = useAuth();
+  return <InvoicesPage isReadOnly={user?.role !== 'ADMIN'} />;
+};
+
+// Receivables: payment recording is admin-only; accountant is read-only
+const ReceivablesRoute: React.FC = () => {
+  const { user } = useAuth();
+  return <ReceivablesPage isReadOnly={user?.role !== 'ADMIN'} />;
+};
+
 // Dynamic landing page router directing each role to its dedicated home view
 const RoleLanding: React.FC = () => {
   const { user } = useAuth();
@@ -36,7 +59,7 @@ const RoleLanding: React.FC = () => {
   if (user.role === 'SALESMAN') return <Navigate to="/orders/new" replace />;
   if (user.role === 'ADMIN') return <Navigate to="/orders" replace />;
   if (user.role === 'PRODUCTION') return <Navigate to="/production" replace />;
-  if (user.role === 'ACCOUNTANT') return <Navigate to="/reports" replace />;
+  if (user.role === 'ACCOUNTANT') return <Navigate to="/receivables" replace />;
   return <OwnerDashboardPage />;
 };
 
@@ -61,7 +84,7 @@ export default function App() {
                   - salesman: New order (/orders/new)
                   - admin: Orders (/orders)
                   - production: Production (/production)
-                  - accountant: Reports (/reports)
+                  - accountant: Receivables (/receivables)
                   - owner: Overview (/)
               */}
               <Route index element={<RoleLanding />} />
@@ -70,8 +93,8 @@ export default function App() {
               <Route
                 path="orders"
                 element={
-                  <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'SALESMAN']}>
-                    <SalesmanOrdersList />
+                  <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'SALESMAN', 'ACCOUNTANT']}>
+                    <OrdersRoute />
                   </RoleGuard>
                 }
               />
@@ -118,13 +141,18 @@ export default function App() {
                 }
               />
               <Route
+                path="invoices"
+                element={
+                  <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'ACCOUNTANT']}>
+                    <InvoicesRoute />
+                  </RoleGuard>
+                }
+              />
+              <Route
                 path="receivables"
                 element={
                   <RoleGuard allowedRoles={['OWNER', 'ADMIN', 'ACCOUNTANT']}>
-                    <PlaceholderModule
-                      title="Receivables & Dues"
-                      subtitle="Customer invoices, payments, credit note allocations, and ageing analysis."
-                    />
+                    <ReceivablesRoute />
                   </RoleGuard>
                 }
               />

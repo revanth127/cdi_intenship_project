@@ -48,6 +48,7 @@ const ALL_NAV_ITEMS: NavItemConfig[] = [
   { label: 'Stock', to: '/stock', icon: Boxes, roles: ['PRODUCTION'] },
   { label: 'Production', to: '/production', icon: Factory, roles: ['PRODUCTION'] },
   // ACCOUNTANT
+  { label: 'Orders', to: '/orders', icon: ShoppingCart, roles: ['ACCOUNTANT'] },
   { label: 'Receivables', to: '/receivables', icon: CreditCard, roles: ['ACCOUNTANT'] },
   { label: 'Invoices', to: '/invoices', icon: FileSpreadsheet, roles: ['ACCOUNTANT'] },
   { label: 'Stock', to: '/stock', icon: Boxes, roles: ['ACCOUNTANT'] },
