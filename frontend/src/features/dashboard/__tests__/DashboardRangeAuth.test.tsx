@@ -37,7 +37,16 @@ const benchmarkSummary = {
       committed_packets: 0,
       available_to_promise_packets: 88,
     }],
-    reorder_alerts: [],
+    reorder_alerts: [{
+      item_id: 1,
+      item_name: 'Flour',
+      item_type: 'RAW_MATERIAL',
+      base_unit: 'g',
+      display_unit: 'kg',
+      current_stock_base: 100000,
+      reorder_level_base: null,
+      deficit_base: null,
+    }],
   },
   variance_alerts: [
     { run_id: 1, run_no: 'PR-2026-0001', run_date: '2026-11-27T09:00:00Z', product_name: 'Murukku 200 g', item_name: 'Cooking oil', planned_qty_base: 10000, actual_qty_base: 10500, difference_qty_base: 500, variance_pct: 5, display_unit: 'L', tolerance_pct: 3 },
@@ -224,6 +233,7 @@ describe('Part 1: Dashboard Range Selection & Session Robustness', () => {
 
   it('renders Overview figures, daily sales rows, and order numbers from backend data', async () => {
     setAccessToken('owner-token');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     globalThis.fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = input.toString();
       if (url.includes('/dashboard/summary')) {
@@ -248,6 +258,7 @@ describe('Part 1: Dashboard Range Selection & Session Robustness', () => {
     expect(within(screen.getByTestId('summary-strip')).getByText('₹31.14')).toBeInTheDocument();
     expect(screen.getByText('Short by 32')).toBeInTheDocument();
     expect(screen.getByText('3 flagged alerts')).toBeInTheDocument();
+    expect(consoleError.mock.calls.flat().join(' ')).not.toContain('same key');
     expect(screen.getByText('10.0 L')).toBeInTheDocument();
     expect(screen.getByText('10.5 L')).toBeInTheDocument();
 

@@ -197,7 +197,7 @@ function mapDashboardData(
     ordersAwaitingApproval: orderRows,
     stockInventory: [
       ...summary.stock.finished_goods.map((item): InventoryItemRow => ({
-        id: String(item.product_id),
+        id: `product:${item.product_id}`,
         name: item.product_name,
         category: 'FINISHED_GOODS',
         unit: 'packets',
@@ -205,7 +205,7 @@ function mapDashboardData(
         available: item.available_to_promise_packets,
       })),
       ...summary.stock.reorder_alerts.map((item): InventoryItemRow => ({
-        id: String(item.item_id),
+        id: `item:${item.item_id}`,
         name: item.item_name,
         category: item.item_type as InventoryItemRow['category'],
         unit: item.display_unit,
