@@ -17,7 +17,6 @@ describe('RoleGuard Security & Navigation Guard', () => {
       isAuthenticated: true,
       isLoading: false,
       login: vi.fn(),
-      mockLoginAs: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -53,7 +52,6 @@ describe('RoleGuard Security & Navigation Guard', () => {
       isAuthenticated: true,
       isLoading: false,
       login: vi.fn(),
-      mockLoginAs: vi.fn(),
       logout: vi.fn(),
     });
 

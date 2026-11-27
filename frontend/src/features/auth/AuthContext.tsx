@@ -6,7 +6,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  mockLoginAs: (role: UserProfile['role']) => void;
   logout: () => void;
 }
 
@@ -70,50 +69,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {
         // Storage unavailable
       }
-    } catch (err) {
-      // In demo mode or if backend offline, fallback to demo user matching email
-      let fallbackUser: UserProfile;
-      if (email.includes('salesman')) {
-        fallbackUser = { id: 3, email, full_name: 'Salesman A (Madurai)', role: 'SALESMAN', is_active: true };
-      } else if (email.includes('prod')) {
-        fallbackUser = { id: 5, email, full_name: 'Production Supervisor', role: 'PRODUCTION', is_active: true };
-      } else if (email.includes('admin')) {
-        fallbackUser = { id: 1, email, full_name: 'System Administrator', role: 'ADMIN', is_active: true };
-      } else if (email.includes('acct') || email.includes('accountant')) {
-        fallbackUser = { id: 6, email, full_name: 'Chief Accountant', role: 'ACCOUNTANT', is_active: true };
-      } else {
-        fallbackUser = { id: 2, email, full_name: 'Senthil Nathan (Owner)', role: 'OWNER', is_active: true };
-      }
-      setUser(fallbackUser);
-      setAccessToken('demo-offline-access-token');
-      try {
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('user_profile', JSON.stringify(fallbackUser));
-          localStorage.setItem('user_profile', JSON.stringify(fallbackUser));
-        }
-      } catch {}
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const mockLoginAs = (role: UserProfile['role']) => {
-    const roleProfiles: Record<UserProfile['role'], UserProfile> = {
-      OWNER: { id: 2, email: 'owner@foodmfr.local', full_name: 'Senthil Nathan (Owner)', role: 'OWNER', is_active: true },
-      ADMIN: { id: 1, email: 'admin@foodmfr.local', full_name: 'System Administrator', role: 'ADMIN', is_active: true },
-      SALESMAN: { id: 3, email: 'salesman.a@foodmfr.local', full_name: 'Salesman A (Madurai)', role: 'SALESMAN', is_active: true },
-      PRODUCTION: { id: 5, email: 'production@foodmfr.local', full_name: 'Production Supervisor', role: 'PRODUCTION', is_active: true },
-      ACCOUNTANT: { id: 6, email: 'accountant@foodmfr.local', full_name: 'Chief Accountant', role: 'ACCOUNTANT', is_active: true },
-    };
-    const selected = roleProfiles[role];
-    setUser(selected);
-    setAccessToken('demo-mock-access-token');
-    try {
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('user_profile', JSON.stringify(selected));
-        localStorage.setItem('user_profile', JSON.stringify(selected));
-      }
-    } catch {}
   };
 
   const logout = () => {
@@ -135,7 +93,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isLoading,
         login,
-        mockLoginAs,
         logout,
       }}
     >

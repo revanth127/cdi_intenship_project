@@ -40,7 +40,6 @@ describe('Part 2: Demo Logins & Role Views', () => {
       isAuthenticated: false,
       isLoading: false,
       login: vi.fn(),
-      mockLoginAs: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -79,7 +78,6 @@ describe('Part 2: Demo Logins & Role Views', () => {
       isAuthenticated: false,
       isLoading: false,
       login: vi.fn(),
-      mockLoginAs: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -116,7 +114,6 @@ describe('Part 2: Demo Logins & Role Views', () => {
       isAuthenticated: true,
       isLoading: false,
       login: vi.fn(),
-      mockLoginAs: vi.fn(),
       logout: vi.fn(),
     });
 
@@ -146,7 +143,6 @@ describe('Part 2: Demo Logins & Role Views', () => {
       isAuthenticated: true,
       isLoading: false,
       login: vi.fn(),
-      mockLoginAs: vi.fn(),
       logout: vi.fn(),
     });
 
