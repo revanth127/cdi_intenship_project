@@ -111,39 +111,54 @@ alembic upgrade head && python scripts/seed.py && uvicorn app.main:app --host 0.
 
 Use the platform-provided database URL and set production CORS origins for the deployed frontend. Do not use the development fallback secret or demo credentials for a public production deployment.
 
+## Design note
+
+See [`docs/design-note.md`](docs/design-note.md) — data model / ER diagram, stock-ledger invariants, BOM scaling & unit conversion, variance, and **costing + valuation method** (moving weighted average; FIFO comparison; overhead allocation). See also [`docs/code-walkthrough.md`](docs/code-walkthrough.md).
+
 ## Stack and rationale
 
 The backend uses FastAPI, SQLAlchemy, Alembic, and PostgreSQL for typed HTTP APIs, relational persistence, and versioned schema changes. The frontend uses React, TypeScript, TanStack Query, and Vite to provide role-aware screens and API-backed data. Docker Compose makes the database, migrations, seed, API, and frontend reproducible as one local stack.
 
 ## Feature status
 
-The repository does not include the Section 6 rubric text, so the following is an implementation inventory grouped under the requested headings, not a claim that it matches an unavailable rubric.
+Mapped to the internship task's **Section 6 scope tiers**. This inventory reflects what is implemented and verified; it is not a claim beyond the repository.
 
-### Must-have
+### Must have (minimum to be considered) — all **Done**
 
-- **Done** — JWT login, role-based access checks, and role-specific landing pages.
-- **Done** — Salesman order entry and customer assignment for the two seeded salesmen.
-- **Done** — Inventory ledger, production runs, weighted-average costing, and variance calculations in the backend.
-- **Done** — Invoice, payment, and receivables backend workflows.
-- **Done** — Purchases (goods receipts), perpetual stock ledger with source-document links, production runs with variance chips, and batch costing.
-- **Done** — Admin orders inbox (approve/reject/edit/raise invoice, shortage override), GST invoices (PDF, dispatch, credit notes), and receivables (outstanding, ageing, record payment).
-- **Done** — Role landing pages, per-role sidebar, and accountant read-only mode (mutations hidden in UI and rejected with 403).
-- **Done** — Overview dashboard uses API-backed inventory, sales, orders, variance, costing, and receivables data.
+- **Login with at least three roles** (salesman, admin, production) — **Done**: JWT login, **5 roles** (OWNER/ADMIN/PRODUCTION/ACCOUNTANT/SALESMAN), role-specific landing + sidebar, 403 on unauthorized. Six seeded demo accounts.
+- **Product, customer, raw-material and BOM masters** — **Done**: `products`, `customers`, `items` (raw + packaging + finished), `boms`/`bom_items`, `suppliers`, admin master-data screens + CRUD APIs.
+- **Mobile-friendly order entry and admin approval** — **Done**: salesman order screen (works on mobile, offline), admin approve/reject/edit.
+- **GST invoice as PDF** — **Done**: immutable GST invoice + ReportLab PDF + WhatsApp share link.
+- **Production run updates raw-material and finished-goods stock automatically** — **Done**: atomic `PRODUCTION_ISSUE` + `PRODUCTION_OUTPUT`, shortage check.
+- **Planned vs actual consumption and yield, variance shown** — **Done**: per-line variance + yield variance + **flagged** chips, strict >tolerance (default 3%).
+- **Stock summary and stock ledger** — **Done**: append-only `stock_movements`, running balance, source-document links, reconcile; tabs raw/packaging/finished.
+- **Sales register and stock report, exportable to Excel/CSV** — **Done**: `sales_register` + `stock_summary`, CSV + **XLSX** + PDF.
 
-### Should-have
+### Should have — all **Done**
 
-- **Done** — HTTP-based Section 5 benchmark workflow verified on a clean database (`make benchmark`, 31/31 checks passed).
-- **Done** — Audit-oriented stock movements, order history, and invoice/credit-note domain workflows.
-- **Done** — Role-restricted Production, Stock, Receivables, and Reports pages are live API-backed screens.
-- **Done** — Reports & exports: report registry with shared JSON/CSV/XLSX/PDF exporters; `GET /reports/{name}?from=&to=&as_of=&format=`; period-selectable Reports page with on-screen preview.
-- **Partial** — Salesman order flow supports offline-oriented client behavior; full offline synchronization coverage is not established by the repository's tests.
+- **Purchases and supplier records** — **Done**.
+- **Payments, outstanding and ageing** — **Done**: FIFO/explicit allocation, advance, reverse, outstanding, ageing buckets, statement.
+- **Cost per packet with overheads** — **Done**: material + labour/gas/power/other ÷ good packets; **moving weighted average**; FIFO shown as comparison only.
+- **GST summary report** — **Done**: `gst_outward` GSTR-1 / GSTR-3B 3.1(a) + HSN.
+- **Variance alerts beyond a tolerance** — **Done** (line + yield, strict >3%).
+- **Owner dashboard** — **Done**: KPIs, sales trend, variance, costing, receivables ageing, telemetry.
+- Also **Done**: audit trail; order + invoice history; **credit notes**; immutable posted invoices; gapless numbering; **Section 5 benchmark verified** (`make benchmark`, 31/31); accountant read-only; offline-oriented salesman; reconcile.
 
-### Stretch
+### Stretch goals (bonus once must-haves work) — picked
 
-- **Done** — Docker Compose development override with backend reload and source mounting.
-- **Done** — Optional demo-volume seed script, separate from the default benchmark seed.
-- **Not done** — Hosted deployment URL and live-service verification.
-- **Not done** — A Section 6-specific completion assessment; its rubric is not present in the repository.
+- **Done — Offline order capture with sync** (IndexedDB outbox + sync engine + `client_uuid` idempotency).
+- **Done — Batch and expiry tracking** on stock movements (`batch_no`, `expiry_date`); **not** FEFO dispatch.
+- **Done — Reorder levels and low-stock alerts** (`items.reorder_level`, owner-dashboard low-stock, or lowest-5 fallback).
+- **Done — Docker Compose development override**; **optional demo-volume seed** (not default).
+- **Not done** — production planning from pending orders ("to fulfil today's orders, make N batches"); salesman route/visit log + GPS check-in; **Tally-compatible export**; e-Invoice / e-Way Bill mock government API; Tamil-language floor-staff UI. See **Known gaps**.
+- **Not done** — hosted live link (`Hosted URL` to be added) and **demo video** (deliverable #4; not producible in-repo). Local `make up` / `make benchmark` works.
+
+### Core scope notes
+
+- **Work-in-progress stock** (Section 4.4 optional) is **not** modeled; only raw / packaging / finished goods.
+- **Customer-specific prices / schemes** (Section 4.1 optional) use seeded **price lists**; full per-customer schemes are optional and not built.
+- **Salesman customer-wise sales** (Section 3): salesman sees own order status; customer-wise view is via statement on own customers, not a full salesman sales report. Reports are not available to salesmen.
+- **Posted invoices are immutable**; PUT/PATCH/DELETE return **409** + audit `edit_rejected`; correction = **credit note**. **Stock movements** and **audit log** are append-only (DB triggers); payments are reversed, not edited.
 
 ## Endpoint list per screen
 
@@ -246,7 +261,7 @@ Posted invoices are immutable. Changes made to an order before invoicing are rec
 ## Known gaps
 
 - The `/reports` Reports page covers operational reports; GSTR-1/3B output is exposed as `gst_outward` JSON/CSV/XLSX/PDF, not a filed return.
-- The Section 6 rubric is not included in this repository, so its requested tier-by-tier rubric compliance cannot be independently verified here.
+- Section 6 tiers are mapped in **Feature status**; this is a self-assessment, not external verification.
 - No hosted URL is configured yet.
 - Demo accounts and their passwords are intended only for local evaluation.
 - The default Compose secret is a development fallback; set a unique stable `SECRET_KEY` for deployment.

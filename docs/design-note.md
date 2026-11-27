@@ -293,3 +293,51 @@ erDiagram
    - A BOM that has been referenced by any `POSTED` production run is strictly immutable.
    - Saving changes automatically increments the version number ($v_1 \to v_2$), leaving the posted run permanently bound to $v_1$ snapshot.
 
+
+---
+
+## Data model (ER diagram)
+
+Core entities and relationships. **Stock is derived** from `stock_movements`, never a mutable column. Money is integer **paise**. Business dates are **IST**; timestamps UTC.
+
+```mermaid
+erDiagram
+    users ||--o{ orders : places
+    users ||--o{ purchases : records
+    customers ||--o{ orders : "ordered by"
+    customers ||--o{ invoices : billed
+    customers ||--o{ payments : pays
+    suppliers ||--o{ purchases : supplies
+    orders ||--o{ order_lines : has
+    orders ||--o{ order_status_history : records
+    orders ||--o| invoices : "becomes"
+    order_lines }o--|| products : "of"
+    invoices ||--o{ invoice_lines : has
+    invoices ||--o{ dispatches : shipped_by
+    invoices ||--o{ credit_notes : corrected_by
+    invoices ||--o{ payment_allocations : paid_by
+    payments ||--o{ payment_allocations : allocates
+    credit_notes ||--o{ credit_note_lines : has
+    items ||--o{ stock_movements : tracked_by
+    items ||--o{ bom_items : consumed_in
+    items ||--o{ purchase_lines : received_as
+    purchases ||--o{ purchase_lines : has
+    product_families ||--o{ products : groups
+    products }o--|| items : "finished goods item"
+    products }o--|| boms : "recipe"
+    product_families ||--o{ boms : "family BOM"
+    boms ||--o{ bom_items : has
+    products ||--o{ packaging_specs : packaging
+    products ||--o{ production_runs : produced
+    boms ||--o{ production_runs : snapshots
+    production_runs ||--o{ production_run_lines : has
+    production_run_lines }o--|| items : "material"
+    production_runs ||--o{ overhead_entries : incurs
+    production_runs ||--o| run_cost_sheets : costed
+    production_runs ||--o{ stock_movements : source
+    purchases ||--o{ stock_movements : source
+    invoices ||--o{ stock_movements : source
+    company_settings ||--|| customers : "seller"
+```
+
+Key tables: `items` (base_unit, display_unit, unit_conversion, reorder_level, hsn, gst), `stock_movements` (signed quantity_base, unit_cost, value_paise, source_type/source_id, reverses_movement_id, batch_no, expiry_date), `boms`/`bom_items` (qty per batch, tolerance, version), `products` + `product_families` + `packaging_specs`, `production_runs`/`production_run_lines`, `overhead_entries`, `run_cost_sheets`, `orders`/`order_lines`/`order_status_history`, `invoices`/`invoice_lines`, `dispatches`, `credit_notes`, `payments`/`payment_allocations`, `audit_log`. See `backend/app/models/`.
