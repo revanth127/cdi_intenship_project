@@ -60,7 +60,7 @@ export const SummaryStrip: React.FC<SummaryStripProps> = ({
 
   const metrics: SummaryMetric[] = [
     {
-      label: 'Orders today',
+      label: 'Orders in range',
       value: formatIndianNumber(data.ordersTodayCount),
       context: `${data.ordersTodayCount} orders, ${formatIndianCurrency(data.ordersTodayValuePaise / 100, { showPaise: false })} value`,
     },
@@ -68,7 +68,7 @@ export const SummaryStrip: React.FC<SummaryStripProps> = ({
       label: 'Awaiting approval',
       value: formatIndianNumber(data.awaitingApprovalCount),
       context: data.awaitingApprovalCount > 0
-        ? `${data.awaitingApprovalCount} orders, ${formatIndianCurrency(data.awaitingApprovalValuePaise / 100, { showPaise: false })}`
+        ? `${data.awaitingApprovalCount} ${data.awaitingApprovalCount === 1 ? 'order' : 'orders'}, ${formatIndianCurrency(data.awaitingApprovalValuePaise / 100, { showPaise: false })}`
         : 'All orders processed',
     },
     {
@@ -123,7 +123,7 @@ export const SummaryStrip: React.FC<SummaryStripProps> = ({
               </span>
             )}
           </div>
-          <span className="mt-1 text-xs text-text-secondary truncate block" title={m.context}>
+          <span className="mt-1 text-xs text-text-secondary block break-words" title={m.context}>
             {m.context}
           </span>
         </div>

@@ -58,6 +58,8 @@ def parse_datetime(dt_val: Optional[Union[datetime, str]]) -> Optional[datetime]
         parts = dt_str.rsplit(" ", 1)
         if len(parts) == 2 and ":" in parts[1]:
             dt_str = f"{parts[0]}+{parts[1]}"
+    if dt_str.endswith(("Z", "z")):
+        dt_str = f"{dt_str[:-1]}+00:00"
     try:
         dt = datetime.fromisoformat(dt_str)
         return ensure_utc(dt)
@@ -269,6 +271,26 @@ def get_dashboard_summary(
         bom_items = db.scalars(select(BOMItem).where(BOMItem.bom_id == r.bom_id)).all()
         tolerance_map = {bi.item_id: bi.variance_tolerance_pct for bi in bom_items}
         prod_name = r.product.item.name if r.product and r.product.item else f"Product {r.product_id}"
+
+        # Yield variance alert (finished packets)
+        if r.is_yield_flagged:
+            eff_tol = default_tolerance
+            variance_items.append(
+                VarianceAlertSummaryItem(
+                    run_id=r.id,
+                    run_no=r.run_no,
+                    run_date=r.run_date,
+                    product_name=prod_name,
+                    item_id=r.product.item_id if (r.product and r.product.item_id) else 0,
+                    item_name="finished packets",
+                    planned_qty_base=r.expected_output_packets,
+                    actual_qty_base=r.actual_good_packets or 0,
+                    difference_qty_base=(r.actual_good_packets or 0) - r.expected_output_packets,
+                    variance_pct=r.yield_variance_pct or Decimal("0.00"),
+                    display_unit="packet",
+                    tolerance_pct=eff_tol,
+                )
+            )
 
         for line in r.lines:
             if line.is_flagged:

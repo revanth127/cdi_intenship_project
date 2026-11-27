@@ -19,7 +19,7 @@ describe('SummaryStrip Component', () => {
     render(<SummaryStrip data={mockData} />);
 
     // Verify all 6 metric blocks are present
-    expect(screen.getByText('Orders today')).toBeInTheDocument();
+    expect(screen.getByText('Orders in range')).toBeInTheDocument();
     expect(screen.getByText('Awaiting approval')).toBeInTheDocument();
     expect(screen.getByText('Stock shortages')).toBeInTheDocument();
     expect(screen.getByText('Variance alerts')).toBeInTheDocument();
@@ -34,6 +34,7 @@ describe('SummaryStrip Component', () => {
     expect(screen.getByText('₹1,24,500')).toBeInTheDocument();
     expect(screen.getByText('₹31.14')).toBeInTheDocument();
     expect(screen.getByText(/Std: ₹30.50/)).toBeInTheDocument();
+    expect(screen.getByText(/4 orders, ₹48,000 value/)).not.toHaveClass('truncate');
   });
 
   it('renders skeleton loading state matching final layout when isLoading is true', () => {

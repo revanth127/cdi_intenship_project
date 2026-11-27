@@ -93,7 +93,7 @@ export const OrdersAwaitingApprovalTable: React.FC<OrdersAwaitingApprovalTablePr
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-surface-subtle border-y border-border text-text-muted font-semibold">
               <tr>
-                <th className="py-2 px-3">Order no</th>
+                <th className="py-2 px-3 min-w-[150px] whitespace-nowrap">Order no</th>
                 <th className="py-2 px-3">Customer</th>
                 <th className="py-2 px-3">Salesman</th>
                 <th className="py-2 px-3 text-right">Value</th>
@@ -110,10 +110,10 @@ export const OrdersAwaitingApprovalTable: React.FC<OrdersAwaitingApprovalTablePr
 
                 return (
                   <tr key={ord.id} className="hover:bg-surface-subtle transition-colors">
-                    <td className="py-2 px-3 font-semibold">
+                    <td className="py-2 px-3 min-w-[150px] whitespace-nowrap font-semibold">
                       <Link
                         to={`/orders/${ord.id}`}
-                        className="text-accent hover:underline focus:outline-none focus:ring-1 focus:ring-accent rounded"
+                        className="text-accent hover:underline whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-accent rounded"
                       >
                         {ord.orderNumber}
                       </Link>

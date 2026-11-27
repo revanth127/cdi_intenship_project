@@ -19,7 +19,7 @@ export interface DashboardData {
     varianceAlertsCount: number;
     outstandingDuesPaise: number;
     costPerPacketRupees: number;
-    standardCostRupees: number;
+    standardCostRupees?: number;
   };
   salesTrend: DailySalesPoint[];
   ordersAwaitingApproval: PendingOrder[];
@@ -34,151 +34,78 @@ export interface DashboardData {
   lastUpdated: string;
 }
 
-// Benchmark-derived fallback data reflecting section 5 numbers
-const BENCHMARK_DATA: DashboardData = {
-  summary: {
-    ordersTodayCount: 4,
-    ordersTodayValuePaise: 4800000, // Rs 48,000
-    awaitingApprovalCount: 2,
-    awaitingApprovalValuePaise: 2400000, // Rs 24,000
-    stockShortagesCount: 1,
-    varianceAlertsCount: 2, // Yield -6% and Oil +5%
-    outstandingDuesPaise: 12450000, // Rs 1,24,500
-    costPerPacketRupees: 31.14,
-    standardCostRupees: 30.50,
-  },
-  salesTrend: [
-    { date: '2026-10-28', label: '28 Oct', salesPaise: 3800000, orderCount: 3 },
-    { date: '2026-10-31', label: '31 Oct', salesPaise: 4200000, orderCount: 4 },
-    { date: '2026-11-04', label: '04 Nov', salesPaise: 5500000, orderCount: 5 },
-    { date: '2026-11-08', label: '08 Nov', salesPaise: 6100000, orderCount: 6 },
-    { date: '2026-11-12', label: '12 Nov', salesPaise: 4800000, orderCount: 4 },
-    { date: '2026-11-16', label: '16 Nov', salesPaise: 7200000, orderCount: 7 },
-    { date: '2026-11-20', label: '20 Nov', salesPaise: 5900000, orderCount: 5 },
-    { date: '2026-11-24', label: '24 Nov', salesPaise: 8400000, orderCount: 8 },
-    { date: '2026-11-26', label: '26 Nov', salesPaise: 4800000, orderCount: 4 },
-  ],
-  ordersAwaitingApproval: [
-    {
-      id: 'ord-101',
-      orderNumber: 'SO-2026-089',
-      customerName: 'Annapoorna Sweets',
-      salesmanName: 'Karthik Raja',
-      totalPaise: 1440000, // Rs 14,400
-      stockStatus: 'IN_STOCK',
-      createdAt: '2026-11-26T09:30:00Z',
-    },
-    {
-      id: 'ord-102',
-      orderNumber: 'SO-2026-090',
-      customerName: 'Murugan Supermarket',
-      salesmanName: 'Suresh Kumar',
-      totalPaise: 960000, // Rs 9,600
-      stockStatus: 'PARTIAL',
-      shortageCount: 12,
-      createdAt: '2026-11-26T10:15:00Z',
-    },
-  ],
-  stockInventory: [
-    {
-      id: 'item-fg-200g',
-      name: 'Murukku 200 g',
-      category: 'FINISHED_GOODS',
-      unit: 'packets',
-      onHand: 238,
-      available: 238,
-      reorderLevel: 100,
-    },
-    {
-      id: 'item-raw-flour',
-      name: 'Rice Flour (Grade A)',
-      category: 'RAW_MATERIAL',
-      unit: 'kg',
-      onHand: 120,
-      available: 120,
-      reorderLevel: 150,
-    },
-    {
-      id: 'item-raw-oil',
-      name: 'Refined Oil',
-      category: 'RAW_MATERIAL',
-      unit: 'L',
-      onHand: 19.5,
-      available: 19.5,
-      reorderLevel: 25,
-    },
-    {
-      id: 'item-pkg-pouch',
-      name: 'Printed Pouch 200 g',
-      category: 'PACKAGING',
-      unit: 'packets',
-      onHand: 306,
-      available: 306,
-      reorderLevel: 400,
-    },
-  ],
-  varianceAlerts: [
-    {
-      id: 'var-1',
-      runId: 'run-b01',
-      runNumber: 'RUN-2026-001',
-      itemName: 'Yield (Murukku 200 g)',
-      unit: 'packets',
-      plannedQty: 200,
-      actualQty: 188,
-      variancePercent: -6.0,
-      severity: 'BREACH',
-      timestamp: '2026-11-26T11:00:00Z',
-    },
-    {
-      id: 'var-2',
-      runId: 'run-b01',
-      runNumber: 'RUN-2026-001',
-      itemName: 'Refined Oil',
-      unit: 'L',
-      plannedQty: 10.0,
-      actualQty: 10.5,
-      variancePercent: 5.0,
-      severity: 'BREACH',
-      timestamp: '2026-11-26T11:00:00Z',
-    },
-  ],
+interface DashboardSummaryResponse {
+  as_of: string;
+  today: {
+    orders_received_count: number;
+    orders_received_value_paise: number;
+    orders_pending_approval_count: number;
+  };
+  stock: {
+    finished_goods: Array<{
+      product_id: number;
+      product_name: string;
+      pack_size_desc: string;
+      on_hand_packets: number;
+      available_to_promise_packets: number;
+    }>;
+    reorder_alerts: Array<{
+      item_id: number;
+      item_name: string;
+      item_type: string;
+      display_unit: string;
+      current_stock_base: number;
+      reorder_level_base: number | null;
+      deficit_base: number | null;
+    }>;
+  };
+  variance_alerts: Array<{
+    run_id: number;
+    run_no: string;
+    run_date: string;
+    product_name: string;
+    item_name: string;
+    planned_qty_base: number;
+    actual_qty_base: number;
+    variance_pct: number;
+    display_unit: string;
+  }>;
   receivables: {
-    totalDuesPaise: 12450000,
-    ageingBuckets: [
-      { label: '0-30 days', amountPaise: 7470000, percentage: 60, colorClass: 'bg-blue-600' },
-      { label: '31-60 days', amountPaise: 3112500, percentage: 25, colorClass: 'bg-amber-500' },
-      { label: '61-90 days', amountPaise: 1245000, percentage: 10, colorClass: 'bg-orange-500' },
-      { label: '90+ days', amountPaise: 622500, percentage: 5, colorClass: 'bg-red-600' },
-    ],
-    topDebtors: [
-      { id: 'c1', name: 'Annapoorna Sweets', totalDuesPaise: 4500000, oldestBucket: '31-60 days' },
-      { id: 'c2', name: 'Murugan Supermarket', totalDuesPaise: 3200000, oldestBucket: '0-30 days' },
-      { id: 'c3', name: 'Krishna Department Stores', totalDuesPaise: 2150000, oldestBucket: '61-90 days' },
-      { id: 'c4', name: 'Saravana Wholesale', totalDuesPaise: 1600000, oldestBucket: '0-30 days' },
-      { id: 'c5', name: 'Ganesh Retailers', totalDuesPaise: 1000000, oldestBucket: '90+ days' },
-    ],
-  },
-  productMargins: [
-    {
-      productId: 'prod-200g',
-      packName: 'Murukku 200 g',
-      familyName: 'Murukku',
-      costPerPacketRupees: 31.14,
-      sellingPriceRupees: 45.0,
-      marginPercent: 30.8,
-    },
-    {
-      productId: 'prod-500g',
-      packName: 'Murukku 500 g',
-      familyName: 'Murukku',
-      costPerPacketRupees: 77.85,
-      sellingPriceRupees: 120.0,
-      marginPercent: 35.1,
-    },
-  ],
-  lastUpdated: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-};
+    total_outstanding_paise: number;
+    bucket_0_30_paise: number;
+    bucket_31_60_paise: number;
+    bucket_61_90_paise: number;
+    bucket_90_plus_paise: number;
+    top_debtors: Array<{
+      customer_id: number;
+      customer_name: string;
+      total_outstanding_paise: number;
+      oldest_invoice_date: string | null;
+    }>;
+  };
+  costing: Array<{
+    product_id: number;
+    product_name: string;
+    cost_per_packet: number;
+    selling_price: number;
+    margin_pct: number;
+  }>;
+  sales_trend: Array<{
+    date: string;
+    taxable_sales_paise: number;
+    invoice_count: number;
+  }>;
+}
+
+interface OrderResponse {
+  id: number;
+  order_no: string;
+  customer_name: string | null;
+  salesman_name: string | null;
+  total_amount_paise: number;
+  created_at: string;
+  stock_availability: Array<{ shortage: number }>;
+}
 
 const PERIOD_TO_RANGE: Record<DashboardPeriod, string> = {
   TODAY: 'today',
@@ -187,33 +114,156 @@ const PERIOD_TO_RANGE: Record<DashboardPeriod, string> = {
   MTD: 'mtd',
 };
 
+const AGEING_BUCKETS: Array<{
+  label: string;
+  amountKey: keyof DashboardSummaryResponse['receivables'];
+  colorClass: string;
+}> = [
+  { label: '0-30 days', amountKey: 'bucket_0_30_paise', colorClass: 'bg-blue-600' },
+  { label: '31-60 days', amountKey: 'bucket_31_60_paise', colorClass: 'bg-amber-500' },
+  { label: '61-90 days', amountKey: 'bucket_61_90_paise', colorClass: 'bg-orange-500' },
+  { label: '90+ days', amountKey: 'bucket_90_plus_paise', colorClass: 'bg-red-600' },
+];
+
+function displayQuantity(baseQuantity: number, displayUnit: string): number {
+  return displayUnit === 'kg' || displayUnit === 'L' ? baseQuantity / 1000 : baseQuantity;
+}
+
+function formatDayLabel(date: string): string {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+  });
+}
+
+function oldestInvoiceBucket(invoiceDate: string | null, asOf: string): string {
+  if (!invoiceDate) return '—';
+
+  const ageDays = Math.max(
+    0,
+    Math.floor((Date.parse(asOf) - Date.parse(invoiceDate)) / (24 * 60 * 60 * 1000))
+  );
+  if (ageDays <= 30) return '0-30 days';
+  if (ageDays <= 60) return '31-60 days';
+  if (ageDays <= 90) return '61-90 days';
+  return '90+ days';
+}
+
+function mapDashboardData(
+  summary: DashboardSummaryResponse,
+  orders: OrderResponse[]
+): DashboardData {
+  const receivablesTotal = summary.receivables.total_outstanding_paise;
+  const costing = summary.costing.map((item): ProductMarginRow => ({
+    productId: String(item.product_id),
+    packName: item.product_name,
+    familyName: item.product_name,
+    costPerPacketRupees: Number(item.cost_per_packet),
+    sellingPriceRupees: Number(item.selling_price),
+    marginPercent: Number(item.margin_pct),
+  }));
+  const orderRows = orders.map((order): PendingOrder => {
+    const shortageCount = order.stock_availability.reduce((sum, line) => sum + line.shortage, 0);
+    return {
+      id: String(order.id),
+      orderNumber: order.order_no,
+      customerName: order.customer_name || 'Unknown customer',
+      salesmanName: order.salesman_name || 'Unknown salesman',
+      totalPaise: order.total_amount_paise,
+      stockStatus: shortageCount > 0 ? 'PARTIAL' : 'IN_STOCK',
+      shortageCount,
+      createdAt: order.created_at,
+    };
+  });
+
+  return {
+    summary: {
+      ordersTodayCount: summary.today.orders_received_count,
+      ordersTodayValuePaise: summary.today.orders_received_value_paise,
+      awaitingApprovalCount: summary.today.orders_pending_approval_count,
+      awaitingApprovalValuePaise: orderRows.reduce((total, order) => total + order.totalPaise, 0),
+      stockShortagesCount: summary.stock.reorder_alerts.filter((item) => item.deficit_base !== null).length,
+      varianceAlertsCount: summary.variance_alerts.length,
+      outstandingDuesPaise: receivablesTotal,
+      costPerPacketRupees: costing[0]?.costPerPacketRupees ?? 0,
+    },
+    salesTrend: summary.sales_trend.map((point): DailySalesPoint => ({
+      date: point.date,
+      label: formatDayLabel(point.date),
+      salesPaise: point.taxable_sales_paise,
+      orderCount: point.invoice_count,
+    })),
+    ordersAwaitingApproval: orderRows,
+    stockInventory: [
+      ...summary.stock.finished_goods.map((item): InventoryItemRow => ({
+        id: String(item.product_id),
+        name: item.product_name,
+        category: 'FINISHED_GOODS',
+        unit: 'packets',
+        onHand: item.on_hand_packets,
+        available: item.available_to_promise_packets,
+      })),
+      ...summary.stock.reorder_alerts.map((item): InventoryItemRow => ({
+        id: String(item.item_id),
+        name: item.item_name,
+        category: item.item_type as InventoryItemRow['category'],
+        unit: item.display_unit,
+        onHand: displayQuantity(item.current_stock_base, item.display_unit),
+        available: displayQuantity(item.current_stock_base, item.display_unit),
+        reorderLevel: item.reorder_level_base === null
+          ? undefined
+          : displayQuantity(item.reorder_level_base, item.display_unit),
+      })),
+    ],
+    varianceAlerts: summary.variance_alerts.map((alert): VarianceAlert => ({
+      id: `${alert.run_id}-${alert.item_name}`,
+      runId: String(alert.run_id),
+      runNumber: alert.run_no,
+      itemName: alert.item_name === 'finished packets'
+        ? `Yield (${alert.product_name})`
+        : alert.item_name,
+      unit: alert.display_unit,
+      plannedQty: displayQuantity(alert.planned_qty_base, alert.display_unit),
+      actualQty: displayQuantity(alert.actual_qty_base, alert.display_unit),
+      variancePercent: Number(alert.variance_pct),
+      severity: 'BREACH',
+      timestamp: alert.run_date,
+    })),
+    receivables: {
+      totalDuesPaise: receivablesTotal,
+      ageingBuckets: AGEING_BUCKETS.map(({ label, amountKey, colorClass }) => {
+        const amountPaise = summary.receivables[amountKey] as number;
+        return {
+          label,
+          amountPaise,
+          percentage: receivablesTotal > 0 ? (amountPaise / receivablesTotal) * 100 : 0,
+          colorClass,
+        };
+      }),
+      topDebtors: summary.receivables.top_debtors.map((customer): DebtorCustomer => ({
+        id: String(customer.customer_id),
+        name: customer.customer_name,
+        totalDuesPaise: customer.total_outstanding_paise,
+        oldestBucket: oldestInvoiceBucket(customer.oldest_invoice_date, summary.as_of),
+      })),
+    },
+    productMargins: costing,
+    lastUpdated: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
+
 export function useDashboardData(period: DashboardPeriod) {
-  const rangeParam = PERIOD_TO_RANGE[period] || 'today';
+  const rangeParam = PERIOD_TO_RANGE[period];
 
   return useQuery<DashboardData>({
     queryKey: ['dashboard-data', rangeParam],
     queryFn: async () => {
-      try {
-        // Attempt to fetch live from backend with range parameter
-        const summary = await apiClient.get<any>(`/dashboard/summary?range=${rangeParam}`);
-        if (summary) {
-          // If backend returns data, merge into the benchmark shape
-          return {
-            ...BENCHMARK_DATA,
-            summary: {
-              ...BENCHMARK_DATA.summary,
-              ...summary,
-            },
-            lastUpdated: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-          };
-        }
-      } catch {
-        // Fall back gracefully to benchmark data (guaranteeing deterministic operations console experience)
-      }
-      return {
-        ...BENCHMARK_DATA,
-        lastUpdated: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      };
+      const [summary, orders] = await Promise.all([
+        apiClient.get<DashboardSummaryResponse>(`/dashboard/summary?range=${rangeParam}`),
+        apiClient.get<OrderResponse[]>('/orders?status=SUBMITTED'),
+      ]);
+      return mapDashboardData(summary, orders);
     },
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,

@@ -13,7 +13,7 @@ export interface InventoryItemRow {
   unit: string;
   onHand: number;
   available: number;
-  reorderLevel: number;
+  reorderLevel?: number;
 }
 
 export interface StockInventoryTableProps {
@@ -100,7 +100,9 @@ export const StockInventoryTable: React.FC<StockInventoryTableProps> = ({
             </thead>
             <tbody className="divide-y divide-border">
               {items.map((item) => {
-                const ratio = item.reorderLevel > 0 ? (item.available / item.reorderLevel) : 1;
+                const reorderLevel = item.reorderLevel ?? 0;
+                const hasReorderLevel = reorderLevel > 0;
+                const ratio = hasReorderLevel ? item.available / reorderLevel : 1;
                 const percent = Math.min(Math.max(Math.round(ratio * 100), 5), 100);
 
                 let statusVariant: 'ok' | 'warning' | 'breach' = 'ok';
@@ -111,7 +113,7 @@ export const StockInventoryTable: React.FC<StockInventoryTableProps> = ({
                   statusVariant = 'breach';
                   statusText = 'Stockout';
                   barColor = 'bg-status-breach-text';
-                } else if (item.available <= item.reorderLevel) {
+                } else if (hasReorderLevel && item.available <= reorderLevel) {
                   statusVariant = 'warning';
                   statusText = 'Below reorder';
                   barColor = 'bg-status-warning-text';
@@ -132,7 +134,7 @@ export const StockInventoryTable: React.FC<StockInventoryTableProps> = ({
                       {formatQuantityWithUnit(item.available, item.unit)}
                     </td>
                     <td className="py-2 px-3 text-right tabular-nums text-text-muted">
-                      {formatQuantityWithUnit(item.reorderLevel, item.unit)}
+                      {hasReorderLevel ? formatQuantityWithUnit(reorderLevel, item.unit) : '—'}
                     </td>
                     <td className="py-2 px-3">
                       <div className="flex items-center gap-2">

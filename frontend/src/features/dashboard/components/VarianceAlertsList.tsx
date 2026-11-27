@@ -107,6 +107,8 @@ export const VarianceAlertsList: React.FC<VarianceAlertsListProps> = ({
                 const isOver = alert.variancePercent > 0;
                 const formattedVar = `${isOver ? '+' : ''}${alert.variancePercent.toFixed(1)}%`;
                 const chipVariant = alert.severity === 'BREACH' ? 'breach' : 'warning';
+                const quantityDecimals =
+                  Number.isInteger(alert.plannedQty) && Number.isInteger(alert.actualQty) ? 0 : 1;
 
                 return (
                   <tr key={alert.id} className="hover:bg-surface-subtle transition-colors">
@@ -122,10 +124,10 @@ export const VarianceAlertsList: React.FC<VarianceAlertsListProps> = ({
                       {alert.itemName}
                     </td>
                     <td className="py-2 px-3 text-right tabular-nums text-text-muted">
-                      {formatQuantityWithUnit(alert.plannedQty, alert.unit)}
+                      {formatQuantityWithUnit(alert.plannedQty, alert.unit, quantityDecimals)}
                     </td>
                     <td className="py-2 px-3 text-right tabular-nums font-semibold text-text-primary">
-                      {formatQuantityWithUnit(alert.actualQty, alert.unit)}
+                      {formatQuantityWithUnit(alert.actualQty, alert.unit, quantityDecimals)}
                     </td>
                     <td className="py-2 px-3 text-right">
                       <StatusChip
